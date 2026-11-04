@@ -1,0 +1,23 @@
+# Copia este archivo a ".dev.vars" (sin .example) para probar los correos en
+# tu computador con:  npm run preview:api
+#
+# Wrangler lee este archivo automáticamente. NO lo subas a GitHub.
+# Estos son los MISMOS valores que pones en Cloudflare Pages → Settings →
+# Environment variables cuando despliegas.
+
+SUPABASE_URL=https://TU-PROYECTO.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=TU_LLAVE_SERVICE_ROLE
+# 'brevo' (gratis, solo verifica un correo) o 'resend' (exige dominio propio)
+PROVEEDOR_CORREO=brevo
+BREVO_API_KEY=
+RESEND_API_KEY=
+CORREO_REMITENTE=Torremolinos Indicadores <onboarding@resend.dev>
+CRON_SECRET=inventa-una-clave-larga-aqui
+URL_PUBLICA=http://localhost:8788
+
+# Opcional. Mientras no tengas dominio verificado en Resend, desvía TODOS los
+# correos a esta dirección (la de tu cuenta de Resend) para poder probar.
+CORREO_PRUEBAS=
+
+# Opcional: dirección pública del logo para los correos (prioridad sobre URL_PUBLICA).
+LOGO_URL=

@@ -1,0 +1,423 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useSesion } from '../lib/useSesion';
+import IndicadorChart, { TendenciaChart } from '../components/IndicadorChart';
+import PageHeader from '../components/PageHeader';
+import { traducirError } from '../lib/indicadores';
+import { avisar } from '../lib/toast';
+import Dialogo from '../components/Dialogo';
+import {
+  getIndicador, getRegistrosMultiAnio, guardarRegistro, sugerirPlanAccion, cumpleMeta,
+  formatearValor, formatearMeta, mesReporteActual, MESES, getProcesos, getCierresDelAnio,
+  esPorcentaje, entradaAValor, valorAEntrada, estadisticasIndicador, desviacionVsMeta, exportarExcel, metaDelMes,
+  estaCerrado, getConfiguracionNotificaciones, MESES_CORTO, formatearMetaMensual, tipoMetaEfectivo,
+} from '../lib/indicadores';
+
+export default function IndicadorDetalle() {
+  const { id } = useParams();
+  const [params] = useSearchParams();
+  const { sesion } = useSesion();
+  const { anio: anioActual, mesActual: mesHoy } = mesReporteActual();
+
+  const [indicador, setIndicador] = useState(null);
+  const [procesoClave, setProcesoClave] = useState(null);
+  const [anio, setAnio] = useState(() => Number(new URLSearchParams(window.location.search).get('anio')) || anioActual);
+  const [comparar, setComparar] = useState('');
+  const [registros, setRegistros] = useState([]);
+  const [registrosComparacion, setRegistrosComparacion] = useState([]);
+  const [registrosAnterior, setRegistrosAnterior] = useState([]);
+  const [modoMeta, setModoMeta] = useState('');
+  const [planeado, setPlaneado] = useState('meta');
+  const [desdeG, setDesdeG] = useState(1);
+  const [hastaG, setHastaG] = useState(12);
+  const [errorForm, setErrorForm] = useState(null);
+  const [cierres, setCierres] = useState([]);
+  const [diaCierre, setDiaCierre] = useState(12);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [mesAbierto, setMesAbierto] = useState(null);
+  const [form, setForm] = useState({ valor: '', analisis: '', causa: '', accion: '', responsable_accion: '', fecha_compromiso: '' });
+  const [guardando, setGuardando] = useState(false);
+
+  async function cargar() {
+    setCargando(true); setError(null);
+    try {
+      const anios = [...new Set([anio, anio - 1, ...(comparar ? [Number(comparar)] : [])])];
+      const [ind, regsMulti, procesos, cierresAnio, cfg] = await Promise.all([
+        getIndicador(id), getRegistrosMultiAnio(id, anios), getProcesos(), getCierresDelAnio(anio),
+        getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 12 })),
+      ]);
+      setDiaCierre(cfg?.dia_cierre ?? 12);
+      setIndicador(ind);
+      setRegistros(regsMulti.filter(r => r.anio === anio));
+      setRegistrosComparacion(comparar ? regsMulti.filter(r => r.anio === Number(comparar)) : []);
+      setRegistrosAnterior(regsMulti.filter(r => r.anio === anio - 1));
+      setProcesoClave(procesos.find(p => p.id === ind.proceso_id)?.clave || null);
+      setCierres(cierresAnio);
+    } catch (err) {
+      const sinFila = err?.code === 'PGRST116' || /rows? returned|no rows/i.test(err?.message || '');
+      setError(sinFila ? 'No encontramos este indicador. Puede que se haya desactivado o que el enlace esté incompleto.' : err.message);
+    } finally { setCargando(false); }
+  }
+  useEffect(() => { cargar(); /* eslint-disable-next-line */ }, [id, anio, comparar]);
+
+  const porMes = useMemo(() => new Map(registros.map(r => [r.mes, r])), [registros]);
+
+  // Si se llegó desde la cinta de meses (?mes=5), abre ese mes al cargar.
+  const [mesUrlUsado, setMesUrlUsado] = useState(false);
+  useEffect(() => {
+    const m = Number(params.get('mes'));
+    if (!mesUrlUsado && indicador && m >= 1 && m <= 12) {
+      setMesUrlUsado(true);
+      abrirMes(m);
+    }
+    // eslint-disable-next-line
+  }, [indicador, params, mesUrlUsado]);
+  const mesCerradoEn = useMemo(() => (m) => estaCerrado(anio, m, cierres, diaCierre), [anio, cierres, diaCierre]);
+  const stats = useMemo(() => (indicador ? estadisticasIndicador(indicador, registros) : null), [indicador, registros]);
+
+  function abrirMes(mes) {
+    const reg = porMes.get(mes);
+    setMesAbierto(mes);
+    setForm({
+      valor: valorAEntrada(indicador, reg?.valor),
+      analisis: reg?.analisis ?? '',
+      causa: reg?.causa ?? '',
+      accion: reg?.accion ?? '',
+      responsable_accion: reg?.responsable_accion ?? '',
+      fecha_compromiso: reg?.fecha_compromiso ?? '',
+    });
+  }
+
+  function sugerir() {
+    const valorMesAnterior = porMes.get(mesAbierto - 1)?.valor;
+    const sugerencia = sugerirPlanAccion({ indicador, procesoClave, valor: entradaAValor(indicador, form.valor), mes: mesAbierto, valorMesAnterior });
+    setForm(f => ({ ...f, analisis: sugerencia.analisis || f.analisis, causa: sugerencia.causa || f.causa, accion: sugerencia.accion || f.accion }));
+  }
+
+  async function guardar(e) {
+    e.preventDefault();
+    setErrorForm(null);
+    // Reglas de negocio: el valor y el plan de acción son siempre obligatorios.
+    if (form.valor === '' || form.valor == null) { setErrorForm('Escribe el valor del indicador.'); return; }
+    if (!String(form.accion || '').trim()) { setErrorForm('El plan de acción es obligatorio, incluso cuando el indicador cumple.'); return; }
+    setGuardando(true); setError(null);
+    try {
+      await guardarRegistro({
+        indicador_id: Number(id), anio, mes: mesAbierto,
+        valor: entradaAValor(indicador, form.valor),
+        analisis: form.analisis, causa: form.causa, accion: form.accion,
+        responsable_accion: form.responsable_accion, fecha_compromiso: form.fecha_compromiso || null,
+        plan_sugerido: false,
+        registrado_por: sesion?.email,
+      });
+      const cumple = cumpleMeta(indicador, entradaAValor(indicador, form.valor), mesAbierto);
+      const nombreMes = MESES[mesAbierto - 1];
+      setMesAbierto(null);
+      await cargar();
+      if (cumple === true) avisar(`${nombreMes} guardado: ¡cumple la meta!`, { tipo: 'ok', celebrar: true });
+      else if (cumple === false) avisar(`${nombreMes} guardado: no alcanzó la meta. Quedó su plan de acción.`, { tipo: 'alerta' });
+      else avisar(`${nombreMes} guardado.`, { tipo: 'ok' });
+    } catch (err) { setErrorForm(traducirError(err)); } finally { setGuardando(false); }
+  }
+
+  function descargarCSV() {
+    exportarExcel({
+      nombreArchivo: `${indicador.nombre.replace(/[^\w\sáéíóúñÁÉÍÓÚÑ-]/g, '')} ${anio}`,
+      titulo: indicador.nombre,
+      subtitulo: `Año ${anio} · Meta ${formatearMeta(indicador)} · Responsable: ${indicador.responsable_medicion || '—'} · Cumplimiento ${stats?.pctCumplimiento ?? '—'}%`,
+      filas: MESES.map((nombreMes, i) => {
+        const mes = i + 1;
+        const reg = porMes.get(mes);
+        const cumple = cumpleMeta(indicador, reg?.valor, mes);
+        return {
+          mes: nombreMes,
+          valor: reg?.valor != null ? formatearValor(indicador, reg.valor) : '',
+          meta: formatearValor(indicador, metaDelMes(indicador, mes)),
+          estado: reg?.valor == null ? 'Pendiente' : cumple ? 'Cumple' : 'No cumple',
+          analisis: reg?.analisis || '',
+          causa: reg?.causa || '',
+          accion: reg?.accion || '',
+          responsable: reg?.responsable_accion || '',
+        };
+      }),
+      columnas: [
+        { titulo: 'Mes', valor: f => f.mes, ancho: 90 },
+        { titulo: 'Valor', valor: f => f.valor, ancho: 80, alinear: 'center',
+          estilo: f => 'font-weight:bold;' },
+        { titulo: 'Meta', valor: f => f.meta, ancho: 80, alinear: 'center', estilo: () => 'color:#5C6460;' },
+        { titulo: 'Estado', valor: f => f.estado, ancho: 100, alinear: 'center',
+          estilo: f => f.estado === 'Cumple' ? 'background:#E0EFE5;color:#166534;font-weight:bold;'
+                     : f.estado === 'No cumple' ? 'background:#FAE4E8;color:#A91D3A;font-weight:bold;'
+                     : 'background:#FAF0D8;color:#8A6410;' },
+        { titulo: 'Análisis de cumplimiento', valor: f => f.analisis, ancho: 340 },
+        { titulo: 'Causa', valor: f => f.causa, ancho: 200 },
+        { titulo: 'Plan de acción', valor: f => f.accion, ancho: 340 },
+        { titulo: 'Responsable de la acción', valor: f => f.responsable, ancho: 180 },
+      ],
+    });
+  }
+
+  if (cargando && !indicador) return (
+    <div className="page" aria-busy="true" aria-label="Cargando indicador">
+      <div className="esqueleto" style={{ height: 40, width: 320, marginBottom: 24 }} />
+      <div className="esqueleto" style={{ height: 110, marginBottom: 16 }} />
+      <div className="esqueleto" style={{ height: 320 }} />
+    </div>
+  );
+  if (error && !indicador) return (
+    <div className="page">
+      <PageHeader migas={[{ texto: 'Indicadores', a: '/indicadores' }, { texto: 'No disponible' }]} titulo="No se pudo abrir el indicador" />
+      <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation"></i><span>{error}</span></div>
+      <Link className="btn-secondary" to="/indicadores">Volver a indicadores</Link>
+    </div>
+  );
+
+  const mesCerrado = mesAbierto && mesCerradoEn(mesAbierto);
+  const puedeEditarMes = !mesCerrado && !!sesion?.puedeRegistrar;
+
+  return (
+    <div className="page">
+      <PageHeader
+        migas={[{ texto: 'Seguimiento' }, { texto: 'Indicadores', a: '/indicadores' }, { texto: indicador.nombre }]}
+        titulo={indicador.nombre}
+        descripcion={indicador.objetivo}
+      >
+        <button className="btn-secondary" onClick={descargarCSV}><i className="fa-solid fa-file-excel"></i> Exportar a Excel</button>
+      </PageHeader>
+      <div className="linea-etiquetas" style={{ marginTop: 'calc(var(--s-3) * -1)', marginBottom: 'var(--s-5)' }}>
+        {indicador.categoria && <span className="chip-categoria" style={{ background: indicador.color_categoria }}>{indicador.categoria}</span>}
+        {indicador.responsable_medicion && <span className="chip-ind" style={{ background: 'var(--line-soft)', color: 'var(--ink-2)' }}><i className="fa-regular fa-user"></i> {indicador.responsable_medicion}</span>}
+        {stats?.pctIncumplimiento != null && (
+          <span className={`chip-ind ${stats.pctIncumplimiento > 50 ? 'chip-ind-no' : stats.pctIncumplimiento > 0 ? 'chip-ind-pendiente' : 'chip-ind-ok'}`}>
+            {stats.pctIncumplimiento}% de incumplimiento en {anio}
+          </span>
+        )}
+      </div>
+
+      <section className="panel" aria-label={`El año ${anio} mes a mes`}>
+        <div className="panel-header">
+          <div><h2>{anio} mes a mes</h2><p className="sub">{sesion?.puedeRegistrar ? 'Haz clic en un mes para registrar o corregir su dato.' : 'Haz clic en un mes para ver su detalle.'}</p></div>
+          <div className="cabecera-acciones">
+            <label className="sr-only" htmlFor="sel-anio">Año</label>
+            <select id="sel-anio" value={anio} onChange={e => setAnio(Number(e.target.value))}>
+              {[anioActual, anioActual - 1, anioActual - 2].map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="cinta-grande" role="group" aria-label="Estado de cada mes">
+          {MESES.map((nombreMes, i) => {
+            const mes = i + 1;
+            const reg = porMes.get(mes);
+            const cumple = reg?.valor != null ? cumpleMeta(indicador, reg.valor, mes) : null;
+            const cerrado = mesCerradoEn(mes);
+            const clase = reg?.valor == null ? (cerrado ? 'perdido' : 'pendiente') : cumple ? 'cumple' : 'incumple';
+            return (
+              <button key={mes} type="button" onClick={() => abrirMes(mes)}
+                className={`mes-gr mes-gr-${clase}${anio === anioActual && mes === mesHoy ? ' es-actual' : ''}`}
+                aria-label={`${nombreMes}: ${reg?.valor == null ? (cerrado ? 'venció sin registrar' : 'sin registrar') : (cumple ? 'cumple' : 'no cumple') + ', ' + formatearValor(indicador, reg.valor)}${cerrado ? ', mes cerrado' : ''}`}>
+                <span className="mes-gr-valor">{reg?.valor == null ? (cerrado ? '—' : '·') : formatearValor(indicador, reg.valor)}</span>
+                <span className="mes-gr-nombre">{MESES_CORTO[i]}{cerrado && <i className="fa-solid fa-lock" aria-hidden="true"></i>}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="cinta-leyenda">
+          <span><i className="cinta-punto" style={{ background: 'var(--ok)' }} /> Cumple</span>
+          <span><i className="cinta-punto" style={{ background: 'var(--wine)' }} /> No cumple</span>
+          <span><i className="cinta-punto cinta-perdido" /> Venció sin registrar</span>
+          <span><i className="cinta-punto" style={{ background: '#EAE7DC' }} /> Por registrar</span>
+        </div>
+      </section>
+
+      {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation"></i><span>{error}</span></div>}
+
+      {stats && stats.mesesConDato > 0 && (
+        <div className="cards cards-compactas">
+          <div className="card">
+            <span className="card-label">Cumplimiento {anio}</span>
+            <strong className="card-valor" style={{ color: stats.pctCumplimiento >= 80 ? 'var(--ok)' : stats.pctCumplimiento >= 50 ? 'var(--alerta)' : 'var(--falla)' }}>
+              {stats.pctCumplimiento != null ? `${stats.pctCumplimiento}%` : '—'}
+            </strong>
+            <span className="card-sub">{stats.cumplidos} de {stats.evaluados} meses evaluados</span>
+          </div>
+          <div className="card">
+            <span className="card-label">Incumplimiento {anio}</span>
+            <strong className="card-valor" style={{ color: stats.pctIncumplimiento > 0 ? 'var(--falla)' : 'var(--ok)' }}>
+              {stats.pctIncumplimiento != null ? `${stats.pctIncumplimiento}%` : '—'}
+            </strong>
+            <span className="card-sub">
+              {stats.incumplidos === 0 ? 'Sin meses incumplidos' : `Meses: ${stats.mesesIncumplidos.map(m => MESES[m - 1].slice(0, 3)).join(', ')}`}
+            </span>
+          </div>
+          <div className="card">
+            <span className="card-label">Promedio del año</span>
+            <strong className="card-valor">{formatearValor(indicador, stats.promedio)}</strong>
+            <span className="card-sub">Meta: {formatearMeta(indicador)}</span>
+          </div>
+          <div className="card">
+            <span className="card-label">Meses sin registrar</span>
+            <strong className="card-valor" style={{ color: stats.mesesPendientes > 0 ? 'var(--alerta)' : 'var(--ok)' }}>{stats.mesesPendientes}</strong>
+            <span className="card-sub">{stats.mesesConDato} de 12 diligenciados</span>
+          </div>
+        </div>
+      )}
+
+      <details className="panel ficha">
+        <summary><span>Ficha del indicador</span><small>Directriz, objetivo, fórmula, meta y fuente</small><i className="fa-solid fa-chevron-down" aria-hidden="true"></i></summary>
+        <div className="ficha-cuerpo">
+        <div className="ind-ficha-grid">
+          <div><span className="ind-ficha-label">Directriz de la política</span><p>{indicador.directriz || '—'}</p></div>
+          <div><span className="ind-ficha-label">Estrategia ASG</span><p>{indicador.estrategia_asg || '—'}</p></div>
+          <div><span className="ind-ficha-label">Objetivo</span><p>{indicador.objetivo || '—'}</p></div>
+          <div><span className="ind-ficha-label">Fórmula de cálculo</span><p>{indicador.formula_calculo || <em style={{ opacity: .6 }}>sin definir</em>}</p></div>
+          <div><span className="ind-ficha-label">Unidad de medida</span><p>{indicador.unidad_medida || '—'}</p></div>
+          <div><span className="ind-ficha-label">Tipo de indicador</span><p>{indicador.tipo_indicador || '—'}</p></div>
+          <div><span className="ind-ficha-label">Meta anual</span><p>{formatearMeta(indicador)}</p></div>
+          <div><span className="ind-ficha-label">Meta mensual</span><p>{formatearMetaMensual(indicador)}</p></div>
+          <div><span className="ind-ficha-label">Meta que rige</span><p style={{ textTransform: 'capitalize' }}>{tipoMetaEfectivo(indicador)}{indicador.tipo_meta ? '' : ' (automática)'}</p></div>
+          <div><span className="ind-ficha-label">Frecuencia de medición</span><p style={{ textTransform: 'capitalize' }}>{indicador.frecuencia || '—'}</p></div>
+          <div><span className="ind-ficha-label">Frecuencia de seguimiento</span><p style={{ textTransform: 'capitalize' }}>{indicador.frecuencia_seguimiento || '—'}</p></div>
+          <div><span className="ind-ficha-label">Responsable de la medición</span><p>{indicador.responsable_medicion || '—'}</p></div>
+          <div><span className="ind-ficha-label">Procesos relacionados</span><p>{indicador.procesos_relacionados || '—'}</p></div>
+          <div><span className="ind-ficha-label">Fuente de información</span><p>{indicador.fuente_informacion || '—'}</p></div>
+        </div>
+      </div>
+      </details>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h2>Meta y resultado</h2>
+        </div>
+        <div className="controles-grafica" role="group" aria-label="Opciones de la gráfica">
+          <label className="filtro-etq">Comparar el indicador contra
+            <select value={planeado} onChange={e => setPlaneado(e.target.value)}>
+              <option value="meta">La meta</option>
+              <option value="mes_anterior">El mes anterior</option>
+              <option value="anio_anterior">El mismo mes del año anterior</option>
+            </select>
+          </label>
+          {planeado === 'meta' && (
+            <label className="filtro-etq">Meta en la gráfica
+              <select value={modoMeta} onChange={e => setModoMeta(e.target.value)}>
+                <option value="">La configurada ({tipoMetaEfectivo(indicador)})</option>
+                <option value="mensual">Meta mensual</option>
+                <option value="anual">Meta anual</option>
+              </select>
+            </label>
+          )}
+          <label className="filtro-etq">Desde
+            <select value={desdeG} onChange={e => { const v = Number(e.target.value); setDesdeG(v); if (v > hastaG) setHastaG(v); }}>{MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select>
+          </label>
+          <label className="filtro-etq">Hasta
+            <select value={hastaG} onChange={e => { const v = Number(e.target.value); setHastaG(v); if (v < desdeG) setDesdeG(v); }}>{MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select>
+          </label>
+          <label className="filtro-etq">Superponer otro año
+            <select id="sel-comparar" value={comparar} onChange={e => setComparar(e.target.value)}>
+              <option value="">Ninguno</option>
+              {[anio - 1, anio - 2].map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </label>
+        </div>
+        <IndicadorChart indicador={indicador} registros={registros} registrosAnterior={registrosAnterior} registrosComparacion={registrosComparacion}
+          anioComparacion={comparar} planeado={planeado} modoMeta={modoMeta} desde={desdeG} hasta={hastaG} />
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><h2>Tendencia</h2><p className="sub">Hacia dónde va el indicador en los meses elegidos.</p></div></div>
+        <TendenciaChart indicador={indicador} registros={registros} desde={desdeG} hasta={hastaG} />
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h2>Análisis y plan de acción</h2>
+        </div>
+        <div className="tabla-scroll"><table className="tabla-apilable">
+          <thead><tr><th>Mes</th><th>Valor</th><th>Meta</th><th>Desviación</th><th>Estado</th><th>Análisis</th><th>Plan de acción</th><th></th></tr></thead>
+          <tbody>
+            {MESES.map((nombreMes, i) => {
+              const mes = i + 1;
+              const reg = porMes.get(mes);
+              const cumple = cumpleMeta(indicador, reg?.valor, mes);
+              const estado = reg?.valor == null ? 'Pendiente' : cumple ? 'Cumple' : 'No cumple';
+              const cerrado = mesCerradoEn(mes);
+              const desv = reg?.valor != null ? desviacionVsMeta(indicador, reg.valor, mes) : null;
+              return (
+                <tr key={mes}>
+                  <td className="celda-principal">{nombreMes} {cerrado && <i className="fa-solid fa-lock" title="Mes cerrado" aria-label="Mes cerrado" style={{ color: 'var(--ink-3)', marginLeft: 4, fontSize: 11 }}></i>}</td>
+                  <td data-label="Valor" className="celda-numero">{formatearValor(indicador, reg?.valor)}</td>
+                  <td data-label="Meta" className="celda-numero celda-tenue">{formatearValor(indicador, metaDelMes(indicador, mes))}</td>
+                  <td data-label="Desviación" className="celda-numero">
+                    {desv ? <span className={desv.favorable ? 'desv-ok' : 'desv-mal'}>{desv.texto}</span> : '—'}
+                  </td>
+                  <td data-label="Estado"><span className={`chip-ind ${estado === 'Cumple' ? 'chip-ind-ok' : estado === 'No cumple' ? 'chip-ind-no' : 'chip-ind-pendiente'}`}>{estado}</span></td>
+                  <td data-label="Análisis" className="celda-texto">{reg?.analisis || '—'}</td>
+                  <td data-label="Plan de acción" className="celda-texto">{reg?.accion ? <>{reg.accion}{reg.plan_sugerido && <em className="nota-sugerido">Sugerido por el sistema</em>}</> : '—'}</td>
+                  <td data-label=""><button className="btn-secondary btn-chico" onClick={() => abrirMes(mes)} aria-label={`${!sesion?.puedeRegistrar ? 'Ver' : reg?.valor == null ? 'Registrar' : 'Editar'} ${nombreMes}`}>{!sesion?.puedeRegistrar ? 'Ver' : reg?.valor == null ? 'Registrar' : 'Editar'}</button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table></div>
+      </section>
+
+      {mesAbierto && (
+        <Dialogo titulo={`${MESES[mesAbierto - 1]} ${anio}`} onCerrar={() => setMesAbierto(null)}>
+          <form className="form-dialogo" onSubmit={puedeEditarMes ? guardar : e => e.preventDefault()}>
+            <h2>{MESES[mesAbierto - 1]} {anio}</h2>
+            {!sesion?.puedeRegistrar && (
+              <div className="aviso aviso-info" style={{ marginTop: 0 }}><i className="fa-solid fa-eye"></i><span>Tu rol es de consulta: puedes ver este mes, pero no registrarlo ni editarlo.</span></div>
+            )}
+            {mesCerrado && (
+              <div className="alert" style={{ background: '#FEF3C7', color: '#92400E' }}>
+                <i className="fa-solid fa-lock"></i> Este mes está cerrado y no se puede editar.{sesion?.esAdmin ? ' Reábrelo en Configuración → Cierres mensuales para poder editarlo.' : ' Pide a un administrador que lo reabra en Configuración.'}
+              </div>
+            )}
+            <fieldset disabled={!puedeEditarMes} style={{ border: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <label>Valor del indicador
+                <div className="campo-con-sufijo">
+                  <input
+                    type="number" step="any" autoFocus
+                    value={form.valor}
+                    onChange={e => setForm(f => ({ ...f, valor: e.target.value }))}
+                    placeholder={esPorcentaje(indicador) ? 'Ej: 95' : `Valor en ${indicador.unidad_medida || 'unidades'}`}
+                  />
+                  <span className="sufijo">{esPorcentaje(indicador) ? '%' : (indicador.unidad_medida || '')}</span>
+                </div>
+                <small className="ayuda-campo">
+                  {esPorcentaje(indicador)
+                    ? `Escribe el porcentaje tal cual: 95 significa 95%. Meta: ${formatearMeta(indicador)}.`
+                    : `Meta: ${formatearMeta(indicador)}.`}
+                </small>
+              </label>
+              <label>Análisis de cumplimiento
+                <textarea rows={3} value={form.analisis} onChange={e => setForm(f => ({ ...f, analisis: e.target.value }))} />
+              </label>
+              <label>Causa: por qué cumplió o no cumplió
+                <input value={form.causa} onChange={e => setForm(f => ({ ...f, causa: e.target.value }))} />
+              </label>
+              <label>Plan de acción <span className="obligatorio">obligatorio</span>
+                <textarea rows={3} aria-required="true" value={form.accion} onChange={e => setForm(f => ({ ...f, accion: e.target.value }))} />
+              </label>
+              <div className="ind-form-fila">
+                <label>Responsable de la acción
+                  <input value={form.responsable_accion} onChange={e => setForm(f => ({ ...f, responsable_accion: e.target.value }))} />
+                </label>
+                <label>Fecha compromiso
+                  <input type="date" value={form.fecha_compromiso || ''} onChange={e => setForm(f => ({ ...f, fecha_compromiso: e.target.value }))} />
+                </label>
+              </div>
+            </fieldset>
+            {errorForm && <div className="alert danger" role="alert" style={{ marginBottom: 0 }}><i className="fa-solid fa-circle-exclamation"></i><span>{errorForm}</span></div>}
+            <div className="ind-modal-acciones">
+              {puedeEditarMes && <button type="button" className="btn-secondary" onClick={sugerir}><i className="fa-solid fa-wand-magic-sparkles"></i> Sugerir plan de acción</button>}
+              <div style={{ flex: 1 }} />
+              <button type="button" className="btn-secondary" onClick={() => setMesAbierto(null)}>{puedeEditarMes ? 'Cancelar' : 'Cerrar'}</button>
+              {puedeEditarMes && <button type="submit" className="btn-primary" disabled={guardando}>{guardando ? 'Guardando…' : 'Guardar'}</button>}
+            </div>
+          </form>
+        </Dialogo>
+      )}
+    </div>
+  );
+}

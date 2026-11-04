@@ -1,0 +1,40 @@
+# Correos automáticos del Sistema Integrado de Gestión.
+#
+# Cloudflare Pages no trae un programador de tareas, así que este flujo "toca el
+# timbre" de la función de correos una vez al día. La función decide sola qué
+# toca enviar hoy (hora de Colombia):
+#   - el día del recordatorio (2 por defecto): correo a TODOS los procesos,
+#   - dos días antes del cierre: correo a quienes aún tienen pendientes,
+#   - el día del cierre (12 por defecto): se cierra el mes y se avisa a TODOS.
+# Los demás días no hace nada, así que es seguro que corra a diario.
+#
+# Antes de usarlo, en GitHub: Settings -> Secrets and variables -> Actions ->
+# New repository secret, y crea dos:
+#   APP_URL      la dirección pública de la app, sin barra final
+#                (ej: https://indicadores-torremolinos.pages.dev)
+#   CRON_SECRET  la misma clave que pusiste en Cloudflare Pages
+
+name: Correos automáticos de indicadores
+
+on:
+  schedule:
+    - cron: '0 13 * * *'   # 13:00 UTC = 8:00 a.m. en Colombia, todos los días
+  workflow_dispatch:        # permite ejecutarlo a mano desde la pestaña Actions
+
+jobs:
+  disparar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Llamar a la función de correos
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Faltan los secretos APP_URL y/o CRON_SECRET en GitHub (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          curl -sS --fail-with-body --retry 3 --retry-delay 10 --max-time 90 \
+            "${APP_URL%/}/api/enviar-recordatorios-indicadores?secret=${CRON_SECRET}"
+          echo
