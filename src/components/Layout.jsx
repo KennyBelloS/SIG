@@ -154,6 +154,9 @@ export default function Layout() {
         </div>
       </header>
       <div className={`ruta-progreso p${progreso}`} aria-hidden="true"><i /></div>
+      {sesion?.rolNoLeido && (
+        <div className="aviso-rol" role="alert"><i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong>No pude leer tu rol, por eso ves solo lo básico.</strong> Tus permisos no se perdieron. Recarga la página; si sigue igual, es que falta ejecutar la actualización de la base de datos (el SQL de la versión nueva en Supabase → SQL Editor) o hay un problema de conexión.</div><button type="button" className="btn-secondary btn-chico" onClick={() => window.location.reload()}>Recargar</button></div>
+      )}
       <FranjaPlazo />
 
       <main id="contenido" className="contenido" tabIndex={-1} key={pathname.split('/').slice(0, 2).join('/')}><Outlet /></main>

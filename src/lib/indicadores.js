@@ -902,6 +902,7 @@ export const ROLES = {
 /** Convierte los errores técnicos de la base en mensajes que una persona entiende. */
 export function traducirError(e) {
   const m = (e && e.message) || String(e || '');
+  if (/column .* does not exist|could not find the .* column|schema cache/i.test(m)) return 'Falta ejecutar la actualización de la base de datos (el SQL de la versión nueva). Pídele a quien administra que lo ejecute en Supabase → SQL Editor y vuelve a intentar.';
   if (/row-level security|permission denied/i.test(m)) return 'Tu rol no tiene permiso para hacer esto. Si crees que es un error, pídele a un administrador que revise tu rol.';
   if (/plan_accion_obligatorio/i.test(m)) return 'El plan de acción es obligatorio.';
   if (/está cerrado/i.test(m)) return m;

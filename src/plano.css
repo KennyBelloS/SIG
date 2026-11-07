@@ -573,3 +573,6 @@ td.celda-principal small{ display:block; }
 .modo-importar button[aria-selected="true"]{ background:var(--f-900); border-color:var(--f-900); color:#fff; }
 .modo-importar button[aria-selected="true"] small{ color:rgba(255,255,255,.85); }
 .tour-cuerpo:focus-visible{ outline:3px solid var(--gold); outline-offset:-3px; }
+
+.aviso-rol{ display:flex; gap:14px; align-items:center; flex-wrap:wrap; padding:12px var(--s-6); background:#FDF1F4; border-bottom:3px solid var(--wine); color:var(--ink); }
+.aviso-rol > i{ color:var(--wine); font-size:20px; } .aviso-rol > div{ flex:1 1 320px; font-size:14px; }
