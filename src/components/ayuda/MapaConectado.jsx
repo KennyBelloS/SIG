@@ -4,11 +4,11 @@ import { COLUMNAS, SERVICIOS, ROL, nodosPara } from './contenido';
 
 const FLUJO_CORREO = [
   ['fa-clock', 'GitHub Actions', 'A las 8:00 a.m. (hora de Colombia) toca la puerta de la función de correos con la clave secreta.'],
-  ['fa-bolt', 'Función de correos', 'Comprueba la fecha. Si hoy es 2, 10 o 12, sigue; si no, termina sin hacer nada.'],
+  ['fa-bolt', 'Función de correos', 'Comprueba la fecha. Si hoy es 2, 13 o 16, sigue; si no, termina sin hacer nada.'],
   ['fa-database', 'Supabase', 'La función pregunta qué indicadores faltan en cada proceso y a quién hay que avisar.'],
   ['fa-envelope-open-text', 'La función arma el correo', 'Uno por proceso, con su lista de pendientes, el logo y la firma del cargo.'],
   ['fa-paper-plane', 'Brevo', 'Recibe cada correo y lo entrega a las bandejas de entrada.'],
-  ['fa-lock', 'El día 12', 'Además de avisar, la función cierra el mes en Supabase. Desde ahí nadie puede modificarlo.'],
+  ['fa-lock', 'El día 16', 'Además de avisar, la función cierra el mes en Supabase. Desde ahí nadie puede modificarlo.'],
 ];
 
 /** Mapa interactivo: toca un elemento y se iluminan los que se conectan con él. */

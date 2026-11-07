@@ -6,6 +6,7 @@ import IndicadorDetalle from './pages/IndicadorDetalle';
 import Dashboard from './pages/Dashboard';
 import Novedades from './pages/Novedades';
 import Configuracion from './pages/Configuracion';
+import Auditoria from './pages/Auditoria';
 import Matriz from './pages/Matriz';
 import Informe from './pages/Informe';
 import Importar from './pages/Importar';
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="/resumen" element={<Navigate to="/dashboard" replace />} />
         <Route path="/novedades" element={<SoloAdmin sesion={sesion}><Novedades /></SoloAdmin>} />
         <Route path="/configuracion" element={<SoloAdmin sesion={sesion}><Configuracion /></SoloAdmin>} />
+        <Route path="/auditoria" element={<SoloAdmin sesion={sesion}><Auditoria /></SoloAdmin>} />
       </Route>
     </Routes>
   );

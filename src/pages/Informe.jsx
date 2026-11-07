@@ -29,8 +29,8 @@ export default function Informe() {
     let vivo = true;
     setDatos(null); setError(null);
     Promise.all([getIndicadores(), getProcesos(), getRegistrosDelMes({ anio, mes }), getCierresDelAnio(anio),
-      getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 12 }))])
-      .then(([indicadores, procesos, registros, cierres, cfg]) => vivo && setDatos({ indicadores, procesos, registros, cierres, diaCierre: cfg?.dia_cierre ?? 12 }))
+      getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 15 }))])
+      .then(([indicadores, procesos, registros, cierres, cfg]) => vivo && setDatos({ indicadores, procesos, registros, cierres, diaCierre: cfg?.dia_cierre ?? 15 }))
       .catch(e => vivo && setError(traducirError(e)));
     return () => { vivo = false; };
   }, [anio, mes]);
@@ -97,7 +97,7 @@ export default function Informe() {
 
   return (
     <div className="page informe">
-      <div className="no-imprimir">
+      <div className="no-imprimir con-cajetin">
         <PageHeader
           migas={[{ texto: 'Seguimiento' }, { texto: 'Informe mensual' }]}
           titulo="Informe mensual"
@@ -133,15 +133,15 @@ export default function Informe() {
           </header>
 
           <dl className="informe-resumen">
-            <div><dt>Cumplimiento</dt><dd style={{ color: resumen.pct == null ? undefined : resumen.pct >= 85 ? 'var(--ok)' : resumen.pct >= 60 ? 'var(--gold-ink)' : 'var(--wine)' }}>{resumen.pct == null ? '—' : `${resumen.pct}%`}</dd><small>de los que tienen dato</small></div>
-            <div><dt>Cumplen</dt><dd>{resumen.cumplen}</dd><small>alcanzaron la meta</small></div>
-            <div><dt>No cumplen</dt><dd className={resumen.incumplen ? 'mal' : ''}>{resumen.incumplen}</dd><small>por debajo de la meta</small></div>
-            <div><dt>No diligenciados</dt><dd className={resumen.nodilig ? 'mal' : ''}>{resumen.nodilig}</dd><small>mes vencido sin dato</small></div>
-            <div><dt>Pendientes</dt><dd>{resumen.pend}</dd><small>el mes sigue abierto</small></div>
+            <div><dt>Cumplimiento</dt><dd style={{ color: resumen.pct == null ? undefined : resumen.pct >= 85 ? 'var(--ok)' : resumen.pct >= 60 ? 'var(--gold-ink)' : 'var(--wine)' }}>{resumen.pct == null ? '—' : `${resumen.pct}%`}<small>de los que tienen dato</small></dd></div>
+            <div><dt>Cumplen</dt><dd>{resumen.cumplen}<small>alcanzaron la meta</small></dd></div>
+            <div><dt>No cumplen</dt><dd className={resumen.incumplen ? 'mal' : ''}>{resumen.incumplen}<small>por debajo de la meta</small></dd></div>
+            <div><dt>No diligenciados</dt><dd className={resumen.nodilig ? 'mal' : ''}>{resumen.nodilig}<small>mes vencido sin dato</small></dd></div>
+            <div><dt>Pendientes</dt><dd>{resumen.pend}<small>el mes sigue abierto</small></dd></div>
           </dl>
           {resumen.sinPlan > 0 && <div className="aviso aviso-alerta"><i className="fa-solid fa-triangle-exclamation"></i><span>{resumen.sinPlan} indicador(es) tienen dato pero no plan de acción (registros anteriores a que el plan fuera obligatorio).</span></div>}
 
-          <div className="tabla-scroll">
+          <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte">
             <table className="tabla-informe">
               <thead><tr><th>Indicador</th><th>Meta</th><th>Resultado</th><th>Estado</th><th>Causa (por qué cumplió o no cumplió)</th><th>Plan de acción</th></tr></thead>
               <tbody>

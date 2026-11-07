@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
 import PageHeader from '../components/PageHeader';
 import { avisar } from '../lib/toast';
+import { crearUsuario, cambiarClaveDeUsuario, quitarUsuario, generarClave } from '../lib/usuarios';
 import { traducirError } from '../lib/indicadores';
 import Dialogo, { Confirmar } from '../components/Dialogo';
 import {
@@ -198,7 +199,7 @@ function PestanaIndicadores() {
               <h2>{p.nombre} <button className="btn-texto" onClick={() => { setEditandoProceso(p.id); setNombreProceso(p.nombre); }} title="Renombrar proceso"><i className="fa-solid fa-pen"></i></button></h2>
             )}
           </div>
-          <div className="tabla-scroll"><table>
+          <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte"><table>
             <thead><tr><th>Indicador</th><th>Meta anual</th><th>Meta mensual</th><th>Medición</th><th>Seguimiento</th><th>Responsable</th><th></th></tr></thead>
             <tbody>
               {(indicadoresPorProceso.get(p.id) || []).map(ind => (
@@ -236,8 +237,8 @@ function PestanaCierres() {
   }
   useEffect(() => { cargar(); /* eslint-disable-next-line */ }, [anio]);
 
-  const [diaCierre, setDiaCierre] = useState(12);
-  useEffect(() => { getConfiguracionNotificaciones().then(c => setDiaCierre(c?.dia_cierre ?? 12)).catch(() => {}); }, []);
+  const [diaCierre, setDiaCierre] = useState(15);
+  useEffect(() => { getConfiguracionNotificaciones().then(c => setDiaCierre(c?.dia_cierre ?? 15)).catch(() => {}); }, []);
   const porMes = new Map(cierres.map(c => [c.mes, c]));
 
   const [porCambiar, setPorCambiar] = useState(null);
@@ -262,13 +263,13 @@ function PestanaCierres() {
         </select>
       </div>
       <p style={{ marginTop: 0 }}>
-        Los meses se cierran <strong>solos</strong> cuando vencen: el mes anterior queda bloqueado el día {diaCierre},
+        Los meses se cierran <strong>solos</strong> cuando vencen: el mes anterior se puede registrar hasta el día {diaCierre} (inclusive) y desde el día {diaCierre + 1} queda bloqueado,
         y todos los meses más viejos quedan cerrados siempre. Solo un administrador puede reabrirlos desde aquí.
       </p>
       {error && <div className="alert danger">{error}</div>}
       {mensaje && <div className="alert-inline"><i className="fa-solid fa-circle-info"></i>{mensaje}</div>}
       {cargando ? <Cargando filas={4} /> : (
-        <div className="tabla-scroll"><table>
+        <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte"><table>
           <thead><tr><th>Mes</th><th>Estado</th><th></th></tr></thead>
           <tbody>
             {MESES.map((nombreMes, i) => {
@@ -325,8 +326,9 @@ function proximaFecha(diaMes, hoy = new Date()) {
 /** Estado del envío automático: ¿el despertador está llamando? ¿cuándo toca enviar? */
 function EnvioAutomatico({ cfg }) {
   const hoy = new Date();
-  const cierre = cfg.dia_cierre ?? 12;
-  const aviso = Math.max(1, cierre - 2);
+  const ultimo = cfg.dia_cierre ?? 15;      // último día para registrar
+  const cierre = ultimo + 1;               // el día que el mes queda bloqueado
+  const aviso = Math.max(1, ultimo - 2);
   const pulso = cfg.ultimo_pulso ? new Date(cfg.ultimo_pulso) : null;
   const horas = pulso ? (hoy - pulso) / 36e5 : null;
   const estado = !cfg.activo ? 'apagado' : !pulso ? 'nunca' : horas <= 36 ? 'ok' : 'atrasado';
@@ -339,8 +341,8 @@ function EnvioAutomatico({ cfg }) {
   }[estado];
   const filas = [
     ['fa-envelope', 'Recordatorio del mes anterior', cfg.dia_envio, 'A todos los procesos, con el resumen de cómo cerró el mes'],
-    ['fa-hourglass-half', 'Faltan 2 días para el cierre', aviso, 'Solo a los procesos que todavía tienen pendientes'],
-    ['fa-lock', 'Cierre del mes', cierre, 'El mes se bloquea y se avisa a todos los procesos'],
+    ['fa-hourglass-half', 'Faltan 2 días para el último día', aviso, 'Solo a los procesos que todavía tienen pendientes'],
+    ['fa-lock', 'Cierre del mes', cierre, `El mes queda bloqueado (se pudo registrar hasta el ${ultimo}) y se avisa a todos los procesos`],
   ];
   return (
     <section className="panel envio-auto" aria-label="Envío automático">
@@ -459,14 +461,14 @@ function PestanaNotificaciones() {
         <div className="panel-header"><h2>Calendario de correos automáticos</h2></div>
         <p style={{ marginTop: 0 }}>
           Se envían solos, en hora de Colombia: el <strong>día {form.dia_envio}</strong> se recuerda diligenciar el mes anterior a
-          <strong> todos los procesos</strong>; <strong>dos días antes del cierre</strong> se avisa a quienes aún tienen pendientes; y el
-          <strong> día {form.dia_cierre}</strong> el mes se cierra y se notifica a <strong>todos</strong>.
+          <strong> todos los procesos</strong>; <strong>dos días antes del último día</strong> se avisa a quienes aún tienen pendientes; y el
+          <strong> día {form.dia_cierre + 1}</strong> el mes se cierra y se notifica a <strong>todos</strong>. Se puede registrar hasta el día {form.dia_cierre}, inclusive.
         </p>
         <form className="ind-form-inline" onSubmit={guardar}>
           <label>Día del recordatorio
             <input type="number" min={1} max={28} value={form.dia_envio} onChange={e => setForm(f => ({ ...f, dia_envio: Number(e.target.value) }))} />
           </label>
-          <label>Día del cierre
+          <label>Último día para registrar
             <input type="number" min={3} max={28} value={form.dia_cierre} onChange={e => setForm(f => ({ ...f, dia_cierre: Number(e.target.value) }))} />
           </label>
           <label className="ind-check"><input type="checkbox" checked={form.activo} onChange={e => setForm(f => ({ ...f, activo: e.target.checked }))} /> Envíos activos</label>
@@ -475,7 +477,7 @@ function PestanaNotificaciones() {
         {form.dia_envio === form.dia_cierre && (
           <div className="aviso aviso-alerta" style={{ marginTop: 12 }}>
             <i className="fa-solid fa-triangle-exclamation"></i>
-            <span>El día del recordatorio y el del cierre son el mismo ({form.dia_envio}). Se recomienda el <strong>2</strong> para recordar y el <strong>12</strong> para cerrar, así el equipo tiene plazo.</span>
+            <span>El día del recordatorio y el del cierre son el mismo ({form.dia_envio}). Se recomienda el <strong>2</strong> para recordar y el <strong>15</strong> como último día para registrar, así el equipo tiene plazo.</span>
           </div>
         )}
         <div className="ind-proceso-acciones">
@@ -485,7 +487,7 @@ function PestanaNotificaciones() {
         </div>
         <div className="aviso aviso-info" style={{ marginTop: 12 }}>
           <i className="fa-solid fa-circle-info"></i>
-          <span>Los correos automáticos de los días {form.dia_envio} y {form.dia_cierre} llegan a todos los procesos que tengan correos en Involucrados. Los envíos manuales de aquí y el aviso de 2 días solo salen cuando hay algo pendiente que reportar.</span>
+          <span>Los correos automáticos de los días {form.dia_envio} y {form.dia_cierre + 1} llegan a todos los procesos que tengan correos en Involucrados. Los envíos manuales de aquí y el aviso de 2 días solo salen cuando hay algo pendiente que reportar.</span>
         </div>
       </section>
 
@@ -575,7 +577,7 @@ function PestanaNotificaciones() {
       {historial.length > 0 && (
         <section className="panel">
           <div className="panel-header"><h2>Últimos envíos</h2></div>
-          <div className="tabla-scroll"><table>
+          <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte"><table>
             <thead><tr><th>Fecha</th><th>Proceso</th><th>Tipo</th><th>Resultado</th></tr></thead>
             <tbody>
               {historial.map(h => (
@@ -607,6 +609,13 @@ function PestanaUsuarios() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [aviso, setAviso] = useState(null);
+  const [form, setForm] = useState({ nombre: '', email: '', password: '', rol: 'digitador' });
+  const [creando, setCreando] = useState(false);
+  const [errorForm, setErrorForm] = useState(null);
+  const [creado, setCreado] = useState(null);       // datos de acceso que se muestran UNA vez
+  const [copiado, setCopiado] = useState(false);
+  const [paraClave, setParaClave] = useState(null); // usuario al que se le cambia la contraseña
+  const [paraQuitar, setParaQuitar] = useState(null);
 
   async function cargar() {
     setCargando(true); setError(null);
@@ -629,6 +638,41 @@ function PestanaUsuarios() {
     } catch (err) { setError(traducirError(err)); }
   }
 
+  async function cambiarNombreDe(u, nombre) {
+    setAviso(null); setError(null);
+    try {
+      const { error } = await supabase.from('indicadores_usuarios').update({ nombre: nombre || null }).eq('user_id', u.user_id);
+      if (error) throw error;
+      avisar(nombre ? 'Nombre guardado.' : 'Nombre quitado.', { tipo: 'ok' });
+      await cargar();
+      if (yoMismo(u)) window.dispatchEvent(new Event('tm:sesion-cambio'));
+    } catch (err) { setError(traducirError(err)); }
+  }
+  const yoMismo = u => u.user_id === sesion?.id;
+
+  async function crear(e) {
+    e.preventDefault();
+    setErrorForm(null); setCreado(null); setCopiado(false);
+    const email = form.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { setErrorForm('Escribe un correo válido.'); return; }
+    if (form.password.length < 8) { setErrorForm('La contraseña debe tener al menos 8 caracteres. Puedes generar una.'); return; }
+    setCreando(true);
+    try {
+      const r = await crearUsuario({ email, password: form.password, rol: form.rol, nombre: form.nombre });
+      setCreado({ email, password: r.adoptado ? null : form.password, rol: form.rol, adoptado: !!r.adoptado });
+      setForm({ nombre: '', email: '', password: '', rol: form.rol });
+      avisar(r.adoptado ? 'La cuenta ya existía: se agregó con su rol.' : 'Usuario creado.', { tipo: 'ok', celebrar: !r.adoptado });
+      await cargar();
+    } catch (err) { setErrorForm(err.message); } finally { setCreando(false); }
+  }
+
+  async function copiar(texto) {
+    try { await navigator.clipboard.writeText(texto); setCopiado(true); setTimeout(() => setCopiado(false), 2500); }
+    catch { setCopiado(false); }
+  }
+
+  const textoAcceso = c => `Aplicación de Indicadores de Gestión\nCorreo: ${c.email}\nContraseña temporal: ${c.password}\nAl entrar, cámbiala desde tu nombre, arriba a la derecha.`;
+
   return (
     <>
       <section className="panel">
@@ -639,25 +683,73 @@ function PestanaUsuarios() {
           ))}
         </ul>
       </section>
+
+      <section className="panel" aria-labelledby="crear-usuario">
+        <div className="panel-header"><div><h2 id="crear-usuario">Crear usuario</h2><p className="sub">La cuenta queda lista para entrar de inmediato, con el rol que elijas.</p></div></div>
+        <form className="form-usuario" onSubmit={crear} noValidate>
+          <label>Nombre <span className="texto-tenue">(opcional)</span>
+            <input type="text" name="nombre-nuevo" autoComplete="off" maxLength={90} placeholder="Nombre y apellido…" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
+          </label>
+          <label>Correo
+            <input type="email" name="correo-nuevo" autoComplete="off" spellCheck={false} inputMode="email" placeholder="nombre@falconfarms.com.co…" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+          </label>
+          <label>Contraseña temporal
+            <span className="campo-clave">
+              <input type="text" name="clave-temporal" autoComplete="off" spellCheck={false} value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Mínimo 8 caracteres…" />
+              <button type="button" className="btn-secondary" onClick={() => setForm(f => ({ ...f, password: generarClave() }))}><i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Generar</button>
+            </span>
+          </label>
+          <label>Rol
+            <select value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value }))}>
+              {Object.entries(ROLES).map(([k, r]) => <option key={k} value={k}>{r.nombre}</option>)}
+            </select>
+            <small className="ayuda-campo">{ROLES[form.rol].descripcion}</small>
+          </label>
+          <div className="form-usuario-accion"><button type="submit" className="btn-primary" disabled={creando}>{creando ? 'Creando…' : 'Crear usuario'}</button></div>
+        </form>
+        {errorForm && <div className="alert danger" role="alert" style={{ marginTop: 12 }}><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{errorForm}</span></div>}
+        {creado && (
+          <div className="acceso-creado" role="status">
+            <div className="acceso-creado-cab"><i className="fa-solid fa-circle-check" aria-hidden="true"></i><strong>{creado.adoptado ? 'La cuenta ya existía y quedó agregada' : 'Usuario creado'}</strong></div>
+            <dl>
+              <div><dt>Correo</dt><dd>{creado.email}</dd></div>
+              <div><dt>Rol</dt><dd>{ROLES[creado.rol].nombre}</dd></div>
+              {creado.password ? <div><dt>Contraseña temporal</dt><dd className="clave-visible">{creado.password}</dd></div> : <div><dt>Contraseña</dt><dd>La misma que ya tenía</dd></div>}
+            </dl>
+            {creado.password
+              ? <p className="ayuda-campo">Esta contraseña solo se muestra ahora. Entrégasela por un medio seguro; al entrar, la persona puede cambiarla desde su nombre, arriba a la derecha.</p>
+              : <p className="ayuda-campo">No se tocó su contraseña. Si no la recuerda, usa «Nueva contraseña» en la lista.</p>}
+            {creado.password && <button type="button" className="btn-secondary" onClick={() => copiar(textoAcceso(creado))}><i className={`fa-solid ${copiado ? 'fa-check' : 'fa-copy'}`} aria-hidden="true"></i> {copiado ? 'Copiado' : 'Copiar datos de acceso'}</button>}
+          </div>
+        )}
+      </section>
+
       <section className="panel">
         <div className="panel-header"><h2>Usuarios</h2></div>
-        <p style={{ marginTop: 0 }}>Para agregar una persona nueva: créala primero en Supabase → Authentication → Users, y luego agrégala en Supabase → Table Editor → <code>indicadores_usuarios</code> (user_id = el id de esa cuenta). Desde aquí cambias su rol.</p>
-        {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation"></i><span>{error}</span></div>}
-        {aviso && <div className="aviso aviso-ok" role="status"><i className="fa-solid fa-circle-check"></i><span>{aviso}</span></div>}
+        {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+        {aviso && <div className="aviso aviso-ok" role="status"><i className="fa-solid fa-circle-check" aria-hidden="true"></i><span>{aviso}</span></div>}
         {cargando ? <Cargando filas={4} /> : (
-          <div className="tabla-scroll"><table className="tabla-apilable">
-            <thead><tr><th>Correo</th><th>Rol</th></tr></thead>
+          <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte"><table className="tabla-apilable">
+            <thead><tr><th>Persona</th><th>Rol</th><th><span className="sr-only">Acciones</span></th></tr></thead>
             <tbody>
-              {usuarios.length === 0 && <tr><td colSpan={2} style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Todavía no hay usuarios en esta tabla.</td></tr>}
+              {usuarios.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Todavía no hay usuarios. Crea el primero arriba.</td></tr>}
               {usuarios.map(u => {
                 const yo = u.email && u.email === sesion?.email;
                 return (
                   <tr key={u.user_id}>
-                    <td className="celda-principal">{u.email || u.user_id}{yo && <span className="texto-tenue"> (tú)</span>}</td>
+                    <td className="celda-principal">
+                      <input className="nombre-en-linea" aria-label={`Nombre de ${u.email || u.user_id}`} defaultValue={u.nombre || ''} maxLength={90} placeholder="Sin nombre" key={`${u.user_id}-${u.nombre || ''}`}
+                        onBlur={e => { const v = e.target.value.trim(); if (v !== (u.nombre || '')) cambiarNombreDe(u, v); }} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
+                      <small className="texto-tenue" translate="no">{u.email || u.user_id}{yo && ' (tú)'}</small>
+                    </td>
                     <td data-label="Rol">
                       <select aria-label={`Rol de ${u.email || u.user_id}`} value={u.rol} disabled={yo} title={yo ? 'No puedes cambiar tu propio rol para no quedarte sin acceso' : undefined} onChange={e => cambiarRol(u, e.target.value)}>
                         {Object.entries(ROLES).map(([k, r]) => <option key={k} value={k}>{r.nombre}</option>)}
                       </select>
+                    </td>
+                    <td data-label="Acciones" className="celda-acciones">
+                      <button type="button" className="btn-texto" onClick={() => setParaClave(u)} disabled={yo} title={yo ? 'Cambia tu contraseña desde tu nombre, arriba a la derecha' : undefined}><i className="fa-solid fa-key" aria-hidden="true"></i> Nueva contraseña<span className="sr-only"> de {u.email}</span></button>
+                      <button type="button" className="btn-texto btn-peligro" onClick={() => setParaQuitar(u)} disabled={yo} title={yo ? 'No puedes quitarte el acceso a ti mismo' : undefined}><i className="fa-solid fa-user-xmark" aria-hidden="true"></i> Quitar acceso<span className="sr-only"> a {u.email}</span></button>
                     </td>
                   </tr>
                 );
@@ -666,7 +758,68 @@ function PestanaUsuarios() {
           </table></div>
         )}
       </section>
+
+      {paraClave && <NuevaClaveDialogo usuario={paraClave} onCerrar={() => setParaClave(null)} />}
+      {paraQuitar && (
+        <Confirmar titulo={`¿Quitar el acceso a ${paraQuitar.email}?`} peligro textoBoton="Quitar acceso"
+          texto="La persona ya no podrá entrar a la aplicación y su cuenta se borra. Los datos que registró se conservan. Esta acción no se puede deshacer."
+          onCancelar={() => setParaQuitar(null)}
+          onConfirmar={async () => {
+            try { await quitarUsuario({ user_id: paraQuitar.user_id }); avisar('Acceso quitado.', { tipo: 'ok' }); setAviso(`Se quitó el acceso a ${paraQuitar.email}.`); await cargar(); }
+            catch (err) { setError(err.message); } finally { setParaQuitar(null); }
+          }} />
+      )}
     </>
+  );
+}
+
+/** Diálogo para ponerle una contraseña nueva a otra persona (el administrador se la entrega). */
+function NuevaClaveDialogo({ usuario, onCerrar }) {
+  const [clave, setClave] = useState(() => generarClave());
+  const [error, setError] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  const [hecho, setHecho] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+  async function guardar(e) {
+    e.preventDefault(); setError(null);
+    if (clave.length < 8) { setError('La contraseña debe tener al menos 8 caracteres.'); return; }
+    setGuardando(true);
+    try { await cambiarClaveDeUsuario({ user_id: usuario.user_id, password: clave }); setHecho(true); avisar('Contraseña cambiada.', { tipo: 'ok' }); }
+    catch (err) { setError(err.message); } finally { setGuardando(false); }
+  }
+  async function copiar() { try { await navigator.clipboard.writeText(clave); setCopiado(true); setTimeout(() => setCopiado(false), 2500); } catch { setCopiado(false); } }
+  return (
+    <Dialogo titulo="Nueva contraseña" onCerrar={onCerrar} ancho={500}>
+      <form className="form-dialogo" onSubmit={guardar} noValidate>
+        <h2>Nueva contraseña</h2>
+        <p style={{ marginTop: -6 }}>Para <strong>{usuario.email}</strong>.</p>
+        {!hecho ? (
+          <>
+            <label>Contraseña temporal
+              <span className="campo-clave">
+                <input type="text" autoComplete="off" spellCheck={false} name="clave-nueva-usuario" value={clave} onChange={e => setClave(e.target.value)} />
+                <button type="button" className="btn-secondary" onClick={() => setClave(generarClave())}><i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Generar</button>
+              </span>
+            </label>
+            <p className="ayuda-campo">Se la entregas a la persona; al entrar puede cambiarla desde su nombre, arriba a la derecha.</p>
+            {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+            <div className="ind-modal-acciones">
+              <button type="button" className="btn-secondary" onClick={onCerrar}>Cancelar</button>
+              <button type="submit" className="btn-primary" disabled={guardando}>{guardando ? 'Guardando…' : 'Cambiar contraseña'}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="aviso aviso-ok" role="status" style={{ marginTop: 0 }}><i className="fa-solid fa-circle-check" aria-hidden="true"></i><span>Contraseña cambiada. Solo se muestra ahora:</span></div>
+            <p className="clave-visible clave-grande">{clave}</p>
+            <div className="ind-modal-acciones">
+              <button type="button" className="btn-secondary" onClick={copiar}><i className={`fa-solid ${copiado ? 'fa-check' : 'fa-copy'}`} aria-hidden="true"></i> {copiado ? 'Copiada' : 'Copiar'}</button>
+              <button type="button" className="btn-primary" onClick={onCerrar}>Listo</button>
+            </div>
+          </>
+        )}
+      </form>
+    </Dialogo>
   );
 }
 

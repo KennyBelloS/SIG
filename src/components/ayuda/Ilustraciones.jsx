@@ -161,7 +161,7 @@ export function IlusExcel() {
 }
 
 export function IlusCierre() {
-  const marca = [[2, 'fa-envelope', 'Recordatorio', 'a todos'], [10, 'fa-hourglass-half', 'Faltan 2 días', 'a quien tiene pendientes'], [12, 'fa-lock', 'Cierre', 'el mes se bloquea']];
+  const marca = [[2, 'fa-envelope', 'Recordatorio', 'a todos'], [13, 'fa-hourglass-half', 'Faltan 2 días', 'a quien tiene pendientes'], [16, 'fa-lock', 'Cierre', 'el mes se bloquea']];
   return (
     <div className="ilus-cierre">
       <p className="a-aparece" style={d(0.1)}>Septiembre se gestiona en octubre</p>
@@ -173,7 +173,7 @@ export function IlusCierre() {
           </div>
         ))}
       </div>
-      <div className="ilus-globo a-pop" style={d(4.4)}><i className="fa-solid fa-lock" /> Desde el día 12 solo un administrador puede reabrirlo</div>
+      <div className="ilus-globo a-pop" style={d(4.4)}><i className="fa-solid fa-lock" /> Desde el día 16 solo un administrador puede reabrirlo</div>
     </div>
   );
 }

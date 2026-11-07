@@ -110,7 +110,7 @@ function interpretarMes(v) {
 // --- Registros mensuales ---------------------------------------------------------
 
 /** Valida cada fila de la hoja "Registros". No guarda nada. */
-export function validarRegistros(filas, indicadores, { cierresPorAnio = new Map(), diaCierre = 12 } = {}) {
+export function validarRegistros(filas, indicadores, { cierresPorAnio = new Map(), diaCierre = 15 } = {}) {
   const porNombre = new Map(indicadores.map(i => [norm(i.nombre), i]));
   const vistos = new Map();
   const salida = [];

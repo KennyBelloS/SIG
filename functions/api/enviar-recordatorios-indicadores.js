@@ -11,7 +11,7 @@
 //   GET  ?secret=CRON_SECRET  (programador externo, una vez al día):
 //        día 2  -> recordatorio del mes anterior
 //        día (cierre - 2) -> aviso "quedan 2 días"
-//        día 12 -> cierra el mes anterior y avisa
+//        día 16 (después del 15) -> cierra el mes anterior y avisa
 //
 // Variables de entorno en Cloudflare Pages:
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, CORREO_REMITENTE,
@@ -22,7 +22,7 @@ import { ACTIVOS } from './_logo.js';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-/** Fecha y hora en Colombia (UTC-5, sin horario de verano). El día "2" o "12" debe
+/** Fecha y hora en Colombia (UTC-5, sin horario de verano). El día "2" o "16" debe
  *  contarse como lo vive la finca, no según el reloj del servidor en UTC. */
 function ahoraColombia(base = new Date()) {
   const partes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(base);
@@ -250,16 +250,16 @@ async function registrar(db, datos) { try { await db.insert('indicadores_notific
 async function enviarAProceso(db, env, { proceso, tipo, anio, mes, cfg, activos, appUrl, modo, forzar }) {
   const { pendientes, sinPlan, cumplen, incumplen, total } = await evaluarProceso(db, proceso, anio, mes);
   const nada = pendientes.length === 0 && sinPlan.length === 0;
-  // Los envíos automáticos de los días 2 y 12 llegan a TODOS los procesos, tengan o no pendientes.
+  // Los envíos automáticos de los días 2 y 16 llegan a TODOS los procesos, tengan o no pendientes.
   if (tipo !== 'cierre' && nada && !forzar) return { proceso: proceso.nombre, resultado: 'sin_pendientes', destinatarios: 0 };
 
   const firmaDatos = datosFirma(cfg);
   const base = { proceso: proceso.nombre, mesNombre: MESES[mes - 1], anio, pendientes, firmaDatos, activos, appUrl };
   const resumen = { cumplen, incumplen, pendientes: pendientes.length, total };
   const { asunto, html } =
-    tipo === 'dos_dias' ? correoDosDias({ ...base, diaCierre: cfg?.dia_cierre ?? 12 })
+    tipo === 'dos_dias' ? correoDosDias({ ...base, diaCierre: cfg?.dia_cierre ?? 15 })
     : tipo === 'cierre' ? correoCierre(base)
-    : correoRecordatorio({ ...base, sinPlan, resumen, diaCierre: cfg?.dia_cierre ?? 12 });
+    : correoRecordatorio({ ...base, sinPlan, resumen, diaCierre: cfg?.dia_cierre ?? 15 });
 
   const correos = await correosDe(db, proceso.id);
   if (!correos.length) {
@@ -403,7 +403,7 @@ export async function onRequestGet({ request, env }) {
     const hoy = ahoraColombia();
     const hoyISO = hoy.iso;
     const dia = hoy.dia;
-    const diaCierre = cfg.dia_cierre ?? 12;
+    const diaCierre = cfg.dia_cierre ?? 15;
     const diaAviso = Math.max(1, diaCierre - 2);
     const { anioReporte, mesReporte } = mesReporteActual();
     const salida = { ok: true, fecha: hoyISO };
@@ -422,14 +422,15 @@ export async function onRequestGet({ request, env }) {
     }
 
     // Aviso de dos días antes del cierre (solo a quienes tienen pendientes), también con recuperación
-    if (dia >= diaAviso && dia < diaCierre && !yaEnviado(cfg.ultimo_aviso_cierre)) {
+    if (dia >= diaAviso && dia <= diaCierre && !yaEnviado(cfg.ultimo_aviso_cierre)) {
       salida.dos_dias = await recorrerProcesos(db, env, { ...comun, tipo: 'dos_dias' });
       await db.patch('indicadores_configuracion?id=eq.1', { ultimo_aviso_cierre: hoyISO });
     }
 
     // Cierre: se cierra el mes y se avisa a todos. Solo si nadie decidió ya sobre ese mes:
     // si un administrador lo reabrió, esa decisión se respeta y no se vuelve a cerrar.
-    if (dia >= diaCierre) {
+    // diaCierre es el ÚLTIMO día para registrar: el mes se cierra al día siguiente.
+    if (dia > diaCierre) {
       const [c] = await db.get(`indicadores_cierres?anio=eq.${anioReporte}&mes=eq.${mesReporte}&select=*`);
       if (!c) {
         await db.upsert('indicadores_cierres', { anio: anioReporte, mes: mesReporte, cerrado: true, cerrado_en: new Date().toISOString() }, 'anio,mes');

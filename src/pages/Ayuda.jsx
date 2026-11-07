@@ -15,7 +15,7 @@ const PERMISOS = [
   ['Crear y editar indicadores, metas y frecuencias', ['admin']],
   ['Cerrar y reabrir meses', ['admin']],
   ['Ver Dashboard y Novedades', ['admin']],
-  ['Enviar correos, ver las personas a notificar y cambiar roles', ['admin']],
+  ['Enviar correos, crear usuarios, cambiar roles y contraseñas', ['admin']],
 ];
 
 /** A qué grupo pertenece una guía según el rol más básico que la usa. */
@@ -51,7 +51,7 @@ export default function Ayuda() {
 
   return (
     <div className="page ayuda">
-      <div className="no-imprimir-ayuda">
+      <div className="no-imprimir-ayuda con-cajetin">
         <PageHeader
           migas={[{ texto: 'Ayuda' }, { texto: 'Cómo se usa' }]}
           titulo="Cómo se usa"

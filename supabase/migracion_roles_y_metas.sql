@@ -45,9 +45,10 @@ begin
   if found then
     cerrado := coalesce(fila.cerrado, false);
   else
-    select coalesce(dia_cierre, 12) into dia from indicadores_configuracion where id = 1;
-    dia := least(greatest(coalesce(dia, 12), 1), 28);
-    cerrado := hoy >= (make_date(new.anio, new.mes, 1) + interval '1 month' + ((dia - 1) * interval '1 day'))::date;
+    select coalesce(dia_cierre, 15) into dia from indicadores_configuracion where id = 1;
+    dia := least(greatest(coalesce(dia, 15), 1), 28);
+    -- dia = último día para registrar (inclusive): el mes se cierra al día siguiente
+    cerrado := hoy > (make_date(new.anio, new.mes, 1) + interval '1 month' + ((dia - 1) * interval '1 day'))::date;
   end if;
 
   if cerrado then
@@ -120,3 +121,223 @@ revoke all on indicadores, indicadores_procesos, indicadores_registros, indicado
 -- 6) Latido del envío automático: cada vez que el despertador diario llama, queda anotado
 --    (así el administrador ve en Configuración si el envío automático está funcionando).
 alter table indicadores_configuracion add column if not exists ultimo_pulso timestamptz;
+
+-- 7) Último día para registrar: 15 (el mes se cierra el 16).
+--    Solo se cambia el valor si todavía tiene el anterior (12); un valor que tú ya personalizaste no se toca.
+alter table indicadores_configuracion alter column dia_cierre set default 15;
+update indicadores_configuracion set dia_cierre = 15 where id = 1 and dia_cierre = 12;
+
+-- 8) Registros históricos: lo que viene del libro de Excel original puede no traer plan de acción.
+--    La marca `historico` los exime de la regla; todo lo que se registre desde la aplicación sigue exigiendo plan.
+--    Solo el servidor (llave de servicio) puede MARCAR un registro como histórico: así nadie se salta la regla desde la API.
+alter table indicadores_registros drop constraint if exists plan_accion_obligatorio;   -- se vuelve a crear al final, ya con la excepción
+alter table indicadores_registros add column if not exists historico boolean not null default false;
+
+create or replace function public.indicadores_registros_proteger_historico()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(auth.role(), '') = 'service_role' then return new; end if;
+  if tg_op = 'INSERT' then new.historico := false;
+  else new.historico := new.historico and coalesce(old.historico, false);   -- se puede quitar la marca, nunca ponerla
+  end if;
+  return new;
+end; $$;
+drop trigger if exists trg_indicadores_registros_historico on indicadores_registros;
+create trigger trg_indicadores_registros_historico before insert or update on indicadores_registros
+  for each row execute function public.indicadores_registros_proteger_historico();
+
+alter table indicadores_registros disable trigger trg_indicadores_bloquear_mes_cerrado;   -- el relleno toca meses ya cerrados
+alter table indicadores_registros disable trigger trg_indicadores_registros_historico;    -- y lo hace el dueño de la base, no la aplicación
+update indicadores_registros set historico = true where valor is not null and btrim(coalesce(accion, '')) = '' and not historico;
+alter table indicadores_registros enable trigger trg_indicadores_bloquear_mes_cerrado;
+alter table indicadores_registros enable trigger trg_indicadores_registros_historico;
+alter table indicadores_registros add constraint plan_accion_obligatorio
+  check (historico or valor is null or length(btrim(coalesce(accion, ''))) > 0) not valid;
+
+-- 9) Cierre del año anterior (Hoja2 del libro): meta y resultado en texto, solo como referencia en la ficha.
+alter table indicadores add column if not exists referencia_anterior jsonb;
+
+-- 10) Nombre visible de cada persona. Cada una cambia SOLO el suyo; un administrador puede cambiar el de cualquiera.
+alter table indicadores_usuarios add column if not exists nombre text;
+create or replace function public.indicadores_cambiar_mi_nombre(p_nombre text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'Debes iniciar sesión.' using errcode = '42501'; end if;
+  p_nombre := nullif(btrim(p_nombre), '');
+  if p_nombre is not null and length(p_nombre) > 80 then raise exception 'El nombre no puede pasar de 80 letras.' using errcode = '22001'; end if;
+  insert into indicadores_usuarios (user_id, email, rol, nombre)
+  values (auth.uid(), (select email from auth.users where id = auth.uid()), 'usuario', p_nombre)
+  on conflict (user_id) do update set nombre = excluded.nombre;
+end $$;
+grant execute on function public.indicadores_cambiar_mi_nombre(text) to authenticated;
+
+-- 11) No todos los indicadores se calculan igual: unos se digitan, otros salen de dos números
+--     (ejecutadas ÷ planeadas, numerador ÷ denominador, o la reducción frente al año anterior).
+alter table indicadores add column if not exists calculo text not null default 'directo';
+alter table indicadores drop constraint if exists indicadores_calculo_valido;
+alter table indicadores add constraint indicadores_calculo_valido check (calculo in ('directo', 'ejecucion', 'razon', 'reduccion'));
+alter table indicadores add column if not exists componentes jsonb;            -- nombres de los dos números, p. ej. {"a":"Planeadas","b":"Ejecutadas"}
+alter table indicadores_registros add column if not exists componentes jsonb;  -- los dos números del mes, p. ej. {"a":3,"b":2}
+
+-- 12) Límite de almacenamiento del plan de Supabase (500 MB en el gratuito), para mostrar cuánto espacio queda.
+alter table indicadores_configuracion add column if not exists almacenamiento_limite_mb numeric not null default 500;
+
+-- 13) Auditoría: quién cambió qué, y quién entra y quién sale. Solo la leen los administradores y nadie puede escribirla a mano:
+--     la llenan los disparadores y las funciones de abajo.
+create table if not exists indicadores_auditoria (
+  id bigserial primary key,
+  creado_en timestamptz not null default now(),
+  user_id uuid, email text, nombre text,
+  tipo text not null,          -- acceso | registro | catalogo | cierre | usuario | configuracion | involucrado | importacion
+  accion text not null,        -- ingreso | salida | crear | editar | eliminar | cerrar | reabrir | importar
+  resumen text not null,
+  entidad text, entidad_id text, antes jsonb, despues jsonb
+);
+create index if not exists indicadores_auditoria_fecha on indicadores_auditoria (creado_en desc);
+create index if not exists indicadores_auditoria_tipo on indicadores_auditoria (tipo, creado_en desc);
+alter table indicadores_auditoria enable row level security;
+drop policy if exists auditoria_lectura_admin on indicadores_auditoria;
+create policy auditoria_lectura_admin on indicadores_auditoria for select to authenticated using (public.rol_actual() = 'admin');
+revoke all on indicadores_auditoria from anon;
+revoke insert, update, delete on indicadores_auditoria from authenticated;
+
+create table if not exists indicadores_presencia (
+  user_id uuid primary key, email text, nombre text, pantalla text,
+  desde timestamptz not null default now(), ultima_actividad timestamptz not null default now()
+);
+alter table indicadores_presencia enable row level security;
+drop policy if exists presencia_lectura_admin on indicadores_presencia;
+create policy presencia_lectura_admin on indicadores_presencia for select to authenticated using (public.rol_actual() = 'admin');
+revoke all on indicadores_presencia from anon;
+revoke insert, update, delete on indicadores_presencia from authenticated;
+
+create or replace function public.indicadores_auditar()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  r jsonb; v_uid uuid := auth.uid(); v_email text; v_nombre text; v_tipo text; v_accion text; v_res text; v_id text;
+  v_antes jsonb; v_desp jsonb; v_cambios jsonb; v_ind text;
+begin
+  -- lo que hace el servidor (importar el libro, crear usuarios, cierre automático) registra su propio resumen
+  if auth.role() = 'service_role' then return coalesce(new, old); end if;
+  r := to_jsonb(case when tg_op = 'DELETE' then old else new end);
+  select email, nombre into v_email, v_nombre from indicadores_usuarios where user_id = v_uid;
+  v_accion := case tg_op when 'INSERT' then 'crear' when 'UPDATE' then 'editar' else 'eliminar' end;
+  if tg_op = 'UPDATE' then
+    select coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) into v_cambios
+      from jsonb_each(to_jsonb(new)) e where to_jsonb(old) -> e.key is distinct from e.value and e.key not in ('actualizado_en');
+    if v_cambios = '{}'::jsonb then return new; end if;
+    select coalesce(jsonb_object_agg(k, to_jsonb(old) -> k), '{}'::jsonb) into v_antes from jsonb_object_keys(v_cambios) k;
+    v_desp := v_cambios;
+  elsif tg_op = 'INSERT' then v_desp := r;
+  else v_antes := r; end if;
+  case tg_table_name
+    when 'indicadores_registros' then
+      v_tipo := 'registro'; v_id := r ->> 'id';
+      select nombre into v_ind from indicadores where id = (r ->> 'indicador_id')::bigint;
+      v_res := format('%s, mes %s de %s', coalesce(v_ind, 'Indicador ' || (r ->> 'indicador_id')), r ->> 'mes', r ->> 'anio');
+    when 'indicadores' then v_tipo := 'catalogo'; v_id := r ->> 'id'; v_res := 'Indicador: ' || coalesce(r ->> 'nombre', '');
+    when 'indicadores_cierres' then
+      v_tipo := 'cierre'; v_id := (r ->> 'anio') || '-' || (r ->> 'mes');
+      v_accion := case when coalesce((r ->> 'cerrado')::boolean, false) then 'cerrar' else 'reabrir' end;
+      v_res := format('Mes %s de %s', r ->> 'mes', r ->> 'anio');
+    when 'indicadores_usuarios' then v_tipo := 'usuario'; v_id := r ->> 'user_id'; v_res := 'Usuario: ' || coalesce(r ->> 'email', r ->> 'user_id');
+    when 'indicadores_configuracion' then v_tipo := 'configuracion'; v_id := r ->> 'id'; v_res := 'Configuración de notificaciones y cierre';
+    when 'indicadores_involucrados' then v_tipo := 'involucrado'; v_id := r ->> 'id'; v_res := 'Involucrado: ' || coalesce(r ->> 'nombre', r ->> 'email', '');
+    else v_tipo := 'otro'; v_res := tg_table_name;
+  end case;
+  insert into indicadores_auditoria (user_id, email, nombre, tipo, accion, resumen, entidad, entidad_id, antes, despues)
+  values (v_uid, v_email, v_nombre, v_tipo, v_accion, v_res, tg_table_name, v_id, v_antes, v_desp);
+  return coalesce(new, old);
+end $$;
+
+do $$ declare t text; begin
+  foreach t in array array['indicadores_registros', 'indicadores', 'indicadores_cierres', 'indicadores_usuarios', 'indicadores_configuracion', 'indicadores_involucrados'] loop
+    execute format('drop trigger if exists trg_auditar on %I', t);
+    execute format('create trigger trg_auditar after insert or update or delete on %I for each row execute function public.indicadores_auditar()', t);
+  end loop;
+end $$;
+
+-- Quién entra y quién sale. La pantalla las llama al iniciar y al cerrar sesión; el latido marca quién está en línea.
+create or replace function public.indicadores_registrar_sesion(p_evento text)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_email text; v_nombre text;
+begin
+  if auth.uid() is null then return; end if;
+  if p_evento not in ('ingreso', 'salida') then raise exception 'Evento de sesión no válido.' using errcode = '22023'; end if;
+  select email, nombre into v_email, v_nombre from indicadores_usuarios where user_id = auth.uid();
+  v_email := coalesce(v_email, (select email from auth.users where id = auth.uid()));
+  insert into indicadores_auditoria (user_id, email, nombre, tipo, accion, resumen)
+  values (auth.uid(), v_email, v_nombre, 'acceso', p_evento, case p_evento when 'ingreso' then 'Entró a la aplicación' else 'Salió de la aplicación' end);
+  if p_evento = 'salida' then delete from indicadores_presencia where user_id = auth.uid();
+  else
+    insert into indicadores_presencia (user_id, email, nombre, desde, ultima_actividad) values (auth.uid(), v_email, v_nombre, now(), now())
+    on conflict (user_id) do update set desde = now(), ultima_actividad = now(), email = excluded.email, nombre = excluded.nombre;
+  end if;
+end $$;
+grant execute on function public.indicadores_registrar_sesion(text) to authenticated;
+
+create or replace function public.indicadores_latido(p_pantalla text)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_email text; v_nombre text;
+begin
+  if auth.uid() is null then return; end if;
+  select email, nombre into v_email, v_nombre from indicadores_usuarios where user_id = auth.uid();
+  v_email := coalesce(v_email, (select email from auth.users where id = auth.uid()));
+  insert into indicadores_presencia (user_id, email, nombre, pantalla, desde, ultima_actividad) values (auth.uid(), v_email, v_nombre, left(p_pantalla, 80), now(), now())
+  on conflict (user_id) do update set pantalla = excluded.pantalla, ultima_actividad = now(), email = coalesce(excluded.email, indicadores_presencia.email), nombre = excluded.nombre;
+end $$;
+grant execute on function public.indicadores_latido(text) to authenticated;
+
+-- Cuánto espacio ocupa la base y cuándo se llenaría, calculado con el ritmo real de los últimos 60 días.
+create or replace function public.indicadores_almacenamiento()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_limite numeric; v_base bigint; v_tablas jsonb; v_nuevo numeric := 0; v_n bigint; v_tot bigint; v_ult bigint;
+begin
+  if public.rol_actual() is distinct from 'admin' then raise exception 'Solo un administrador puede ver el almacenamiento.' using errcode = '42501'; end if;
+  select coalesce(almacenamiento_limite_mb, 500) into v_limite from indicadores_configuracion where id = 1;
+  v_base := pg_database_size(current_database());
+  select coalesce(jsonb_agg(jsonb_build_object('tabla', c.relname, 'bytes', pg_total_relation_size(c.oid), 'filas', coalesce(s.n_live_tup, 0)) order by pg_total_relation_size(c.oid) desc), '[]'::jsonb)
+    into v_tablas
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace left join pg_stat_user_tables s on s.relid = c.oid
+    where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'indicadores%';
+  -- bytes de datos nuevos en 60 días = filas nuevas × tamaño medio de una fila
+  select count(*) into v_n from indicadores_registros where registrado_en >= now() - interval '60 days';
+  select count(*) into v_tot from indicadores_registros;
+  v_nuevo := v_nuevo + case when v_tot = 0 then 0 else v_n::numeric / v_tot * pg_total_relation_size('indicadores_registros') end;
+  select count(*) into v_n from indicadores_auditoria where creado_en >= now() - interval '60 days';
+  select count(*) into v_tot from indicadores_auditoria;
+  v_nuevo := v_nuevo + case when v_tot = 0 then 0 else v_n::numeric / v_tot * pg_total_relation_size('indicadores_auditoria') end;
+  return jsonb_build_object('base_bytes', v_base, 'limite_mb', v_limite, 'tablas', v_tablas, 'nuevo_60d_bytes', round(v_nuevo));
+end $$;
+grant execute on function public.indicadores_almacenamiento() to authenticated;
+
+-- 14) Un mes cerrado no se toca de NINGUNA manera: ni se cambia, ni se borra, ni se mueve a otro mes.
+--     (Antes solo se revisaba el mes nuevo de un cambio: se podía borrar un registro cerrado o cambiarle el mes.)
+create or replace function public.indicadores_mes_esta_cerrado(p_anio int, p_mes int)
+returns boolean language plpgsql stable security definer set search_path = public as $$
+declare fila record; dia int; hoy date := (now() at time zone 'America/Bogota')::date;
+begin
+  select * into fila from indicadores_cierres where anio = p_anio and mes = p_mes;
+  if found then return coalesce(fila.cerrado, false); end if;
+  select coalesce(dia_cierre, 15) into dia from indicadores_configuracion where id = 1;
+  dia := least(greatest(coalesce(dia, 15), 1), 28);
+  -- dia = último día para registrar (inclusive): el mes se cierra al día siguiente
+  return hoy > (make_date(p_anio, p_mes, 1) + interval '1 month' + ((dia - 1) * interval '1 day'))::date;
+end $$;
+
+create or replace function public.indicadores_bloquear_mes_cerrado()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if auth.role() = 'service_role' then return coalesce(new, old); end if;
+  if tg_op in ('UPDATE', 'DELETE') and public.indicadores_mes_esta_cerrado(old.anio, old.mes) then
+    raise exception 'Este mes (%/%) está cerrado. Pide a un administrador que lo reabra en Configuración.', old.mes, old.anio using errcode = 'P0001';
+  end if;
+  if tg_op in ('INSERT', 'UPDATE') and public.indicadores_mes_esta_cerrado(new.anio, new.mes) then
+    raise exception 'Este mes (%/%) está cerrado. Pide a un administrador que lo reabra en Configuración.', new.mes, new.anio using errcode = 'P0001';
+  end if;
+  return coalesce(new, old);
+end $$;
+
+drop trigger if exists trg_indicadores_bloquear_mes_cerrado on indicadores_registros;
+create trigger trg_indicadores_bloquear_mes_cerrado before insert or update or delete on indicadores_registros
+  for each row execute function public.indicadores_bloquear_mes_cerrado();

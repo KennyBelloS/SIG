@@ -46,18 +46,20 @@ export async function getCierre(anio, mes) {
 /** ¿El mes ya venció? Vence cuando pasó su fecha de cierre: cualquier mes
  *  anterior al pasado, o el mes pasado si ya estamos en o después del día de
  *  cierre. El mes en curso y los futuros nunca están vencidos. */
-export function mesVencido(anio, mes, diaCierre = 12, hoy = new Date()) {
+/** El mes anterior sigue abierto HASTA el día `diaCierre` (inclusive) y se cierra al día siguiente.
+ *  Ejemplo con 15: el 15 de noviembre octubre aún se puede registrar; el 16 ya está cerrado. */
+export function mesVencido(anio, mes, diaCierre = 15, hoy = new Date()) {
   const anioHoy = hoy.getFullYear(), mesHoy = hoy.getMonth() + 1;
   if (anio > anioHoy) return false;
   if (anio < anioHoy) return true;
   if (mes >= mesHoy) return false;
-  if (mes === mesHoy - 1) return hoy.getDate() >= diaCierre;
+  if (mes === mesHoy - 1) return hoy.getDate() > diaCierre;
   return true;
 }
 
 /** Estado real de un mes: manda la decisión del administrador si existe;
  *  si no, se cierra solo al vencerse. */
-export function estaCerrado(anio, mes, cierres = [], diaCierre = 12, hoy = new Date()) {
+export function estaCerrado(anio, mes, cierres = [], diaCierre = 15, hoy = new Date()) {
   const fila = (cierres || []).find(c => c.anio === anio && c.mes === mes);
   if (fila) return !!fila.cerrado;
   return mesVencido(anio, mes, diaCierre, hoy);
@@ -132,17 +134,19 @@ export async function getRegistrosDelMes({ procesoId = null, anio, mes }) {
   return data || [];
 }
 
-export async function guardarRegistro({ indicador_id, anio, mes, valor, analisis, causa, accion, plan_sugerido, responsable_accion, fecha_compromiso, registrado_por }) {
+export async function guardarRegistro({ indicador_id, anio, mes, valor, analisis, causa, accion, plan_sugerido, responsable_accion, fecha_compromiso, registrado_por, componentes }) {
   const hayValor = valor !== '' && valor !== undefined && valor !== null;
   // Regla de negocio: todo dato registrado lleva su plan de acción.
   if (hayValor && !String(accion || '').trim()) throw new Error('El plan de acción es obligatorio para registrar un dato.');
   const payload = {
     indicador_id, anio, mes,
     valor: hayValor ? valor : null,
+    componentes: componentes ?? null,   // los dos números de los que sale el resultado (si el indicador se calcula)
     analisis: analisis ?? null,
     causa: causa ?? null,
     accion: accion ?? null,
     plan_sugerido: !!plan_sugerido,
+    historico: false,   // lo que se registra desde la aplicación siempre exige plan de acción
     responsable_accion: responsable_accion ?? null,
     fecha_compromiso: fecha_compromiso || null,
     registrado_por: registrado_por ?? null,
@@ -667,6 +671,22 @@ export function describirEnvio(res, { mesNombre } = {}) {
 }
 
 
+/** Pilar de la estrategia ASG de un indicador ("Pilar 4: Reputación e Integridad"), tomado de su campo «Estrategia ASG».
+ *  No depende de que alguien asigne categorías a mano: viene en el libro. */
+const COLOR_PILAR = { 1: '#166534', 2: '#C9932B', 3: '#2F6FB0', 4: '#A91D3A' };
+export function pilarDe(ind) {
+  const m = String(ind?.estrategia_asg || '').match(/Pilar\s*(\d+)\s*:\s*(.*?)\s*(?=Tema\s*:|$)/i);
+  if (!m) return { clave: 'zz-sin-pilar', label: 'Sin pilar', color: null };
+  return { clave: `pilar-${m[1]}`, label: `Pilar ${m[1]}: ${m[2].trim()}`, color: COLOR_PILAR[m[1]] || null };
+}
+const TIPOS = [['cumplimiento', 'Cumplimiento', '#166534'], ['eficiencia', 'Eficiencia', '#C9932B'], ['eficacia', 'Eficacia', '#2F6FB0']];
+export function tipoDe(ind) {
+  const t = String(ind?.tipo_indicador || '').trim();
+  const i = TIPOS.findIndex(x => x[0] === t.toLowerCase());
+  if (!t) return { clave: 'z-sin-tipo', label: 'Sin tipo', color: null };
+  return i >= 0 ? { clave: `${i}-${TIPOS[i][0]}`, label: TIPOS[i][1], color: TIPOS[i][2] } : { clave: `9-${t.toLowerCase()}`, label: t, color: null };
+}
+
 /** Datos completos para el Dashboard: cumplimiento global, evolución mes a
  *  mes, ranking por área y por categoría, y los indicadores extremos. */
 /** Datos del Dashboard. Admite filtro por proceso y por rango de meses.
@@ -674,7 +694,7 @@ export function describirEnvio(res, { mesNombre } = {}) {
  *  Hay DOS tipos de incumplimiento, que se cuentan por separado:
  *    - incumplenMeta: se registró el dato pero no alcanzó la meta
  *    - noDilig:       el mes venció y no se registró nada */
-export async function getDashboard(anio, mesCorte, { procesoId = null, desde = 1, hasta = null, diaCierre = 12 } = {}) {
+export async function getDashboard(anio, mesCorte, { procesoId = null, desde = 1, hasta = null, diaCierre = 15 } = {}) {
   const tope = Math.min(hasta || mesCorte, mesCorte);
   const ini = Math.max(1, desde);
   const [{ data: indicadores, error: e1 }, { data: procesos, error: e2 }] = await Promise.all([
@@ -776,6 +796,21 @@ export async function getDashboard(anio, mesCorte, { procesoId = null, desde = 1
   const porProceso = agrupar(i => i.proceso_id, i => procesoPorId.get(i.proceso_id)?.nombre || '—');
   const porCategoria = agrupar(i => (sinCat(i) ? '__sin_categoria__' : i.categoria.trim()), i => (sinCat(i) ? 'Sin categoría' : i.categoria.trim()), i => (sinCat(i) ? null : i.color_categoria));
 
+  const porPilar = agrupar(i => pilarDe(i).clave, i => pilarDe(i).label, i => pilarDe(i).color).sort((a, b) => String(a.clave).localeCompare(String(b.clave)));
+  const porTipo = agrupar(i => tipoDe(i).clave, i => tipoDe(i).label, i => tipoDe(i).color).sort((a, b) => String(a.clave).localeCompare(String(b.clave)));
+  // una fila por indicador, con todo lo que hace falta para leerlo sin salir del Dashboard
+  const tabla = inds.map(ind => {
+    const a = agregar([ind]);
+    const estados = [];
+    for (let m = ini; m <= tope; m++) estados.push({ mes: m, estado: estadoMes(ind, m).estado });
+    let ultimo = null;
+    for (let m = tope; m >= ini && !ultimo; m--) { const { estado, r } = estadoMes(ind, m); if (r?.valor != null) ultimo = { mes: m, texto: formatearValor(ind, r.valor), estado }; }
+    const p = pilarDe(ind), t = tipoDe(ind);
+    return { id: ind.id, orden: ind.orden, nombre: ind.nombre, proceso: procesoPorId.get(ind.proceso_id)?.nombre || '—', pilar: p.label, pilarColor: p.color, tipo: t.label, tipoColor: t.color,
+      meta: formatearMeta(ind), metaMensual: formatearMetaMensual(ind), ultimo, pct: a.pct, cumplen: a.cumplen, evaluados: a.evaluados, noDilig: a.noDilig, sinPlan: a.sinPlan, estados };
+  });
+  const actualizadoEn = registros.reduce((m, r) => { const t = r.actualizado_en || r.registrado_en || null; return t && (!m || t > m) ? t : m; }, null);
+
   const detalle = inds.map(ind => ({ ind, ...agregar([ind]) })).map(x => ({
     id: x.ind.id, nombre: x.ind.nombre, categoria: x.ind.categoria, color: x.ind.color_categoria,
     proceso: procesoPorId.get(x.ind.proceso_id)?.nombre || '—', pct: x.pct, incumplenMeta: x.incumplenMeta, noDilig: x.noDilig, evaluados: x.evaluados }));
@@ -795,7 +830,7 @@ export async function getDashboard(anio, mesCorte, { procesoId = null, desde = 1
     desde: ini, hasta: tope, filasTipo,
     pctGlobal: global.pct, pctDiligencia: global.pctDiligencia, faltantes: global.noDilig, sinPlan: global.sinPlan,
     acumulado: global,
-    evolucion, matriz, porProceso, porCategoria,
+    evolucion, matriz, porProceso, porCategoria, porPilar, porTipo, tabla, actualizadoEn,
     mejores: [...conDato].sort((a, b) => b.pct - a.pct).slice(0, 5),
     peores: [...conDato].sort((a, b) => a.pct - b.pct).slice(0, 5),
     torta: { meta: torta('incumplenMeta'), dilig: torta('noDilig') },
@@ -876,4 +911,47 @@ export function traducirError(e) {
   if (/jwt|token.*expired|not authenticated/i.test(m)) return 'Tu sesión venció. Cierra sesión y vuelve a entrar.';
   if (/failed to fetch|networkerror|load failed/i.test(m)) return 'No hay conexión con el servidor. Revisa tu internet e inténtalo de nuevo.';
   return m;
+}
+
+
+/** Todos los registros de un año con su análisis y plan (para comparar con un libro de Excel). */
+export async function getRegistrosAnioCompletos(anio) {
+  const { data, error } = await supabase.from('indicadores_registros').select('indicador_id, anio, mes, valor, analisis, accion').eq('anio', anio).limit(5000);
+  if (error) throw error;
+  return data || [];
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// Auditoría, accesos y espacio (solo administradores; la base lo hace cumplir)
+// ---------------------------------------------------------------------------------------------
+
+/** Actividad: quién cambió qué. `tipos` filtra por clase de cambio; `desde` es una fecha ISO. */
+export async function getAuditoria({ tipos = null, desde = null, limite = 60, soloAccesos = false } = {}) {
+  let q = supabase.from('indicadores_auditoria').select('*').order('creado_en', { ascending: false }).limit(limite);
+  if (soloAccesos) q = q.eq('tipo', 'acceso');
+  else if (tipos && tipos.length) q = q.in('tipo', tipos);
+  else q = q.neq('tipo', 'acceso');
+  if (desde) q = q.gte('creado_en', desde);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+/** Quién está en línea: la última actividad es de hace menos de 3 minutos. */
+export async function getPresencia() {
+  const { data, error } = await supabase.from('indicadores_presencia').select('*').order('ultima_actividad', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getAlmacenamiento() {
+  const { data, error } = await supabase.rpc('indicadores_almacenamiento');
+  if (error) throw error;
+  return data;
+}
+
+export async function guardarLimiteAlmacenamiento(mb) {
+  const { error } = await supabase.from('indicadores_configuracion').update({ almacenamiento_limite_mb: mb }).eq('id', 1);
+  if (error) throw error;
 }

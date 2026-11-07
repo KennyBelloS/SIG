@@ -250,7 +250,7 @@ export function correoRecordatorio({ proceso, mesNombre, anio, pendientes, sinPl
     ${destacado({
       numero: pendientes.length,
       etiqueta: pendientes.length === 1 ? 'indicador por registrar' : 'indicadores por registrar',
-      nota: `El mes se cierra el día ${diaCierre}; después no se podrá editar hasta que un administrador lo habilite.`,
+      nota: `Pueden registrar hasta el día ${diaCierre}, inclusive; desde el ${diaCierre + 1} el mes se cierra y no se podrá editar hasta que un administrador lo habilite.`,
       acento: pendientes.length ? 'dorado' : 'verde',
     })}
     ${pendientes.length ? subtitulo('Pendientes por registrar') + listaIndicadores(pendientes, DORADO) : ''}
@@ -265,7 +265,7 @@ export function correoRecordatorio({ proceso, mesNombre, anio, pendientes, sinPl
 export function correoDosDias({ proceso, mesNombre, anio, pendientes, diaCierre, firmaDatos, activos }) {
   const cuerpo = `
     ${p(`Equipo de <strong>${proceso}</strong>:`)}
-    ${destacado({ numero: '2', etiqueta: `días para el cierre de ${mesNombre}`, nota: `El día ${diaCierre} los indicadores quedan bloqueados.`, acento: 'dorado' })}
+    ${destacado({ numero: '2', etiqueta: `días para el último día de ${mesNombre}`, nota: `Pueden registrar hasta el día ${diaCierre}; desde el ${diaCierre + 1} los indicadores quedan bloqueados.`, acento: 'dorado' })}
     ${pendientes.length
       ? p(`Todavía faltan <strong>${pendientes.length}</strong> indicador(es) por registrar. Después del cierre solo un administrador podrá habilitarlos de nuevo.`) + subtitulo('Falta registrar') + listaIndicadores(pendientes, DORADO)
       : p('En este momento no hay indicadores pendientes. Si ya registraron todo, pueden ignorar este mensaje.')}`;

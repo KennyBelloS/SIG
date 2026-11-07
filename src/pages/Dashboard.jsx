@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Chart from 'react-apexcharts';
 import PageHeader from '../components/PageHeader';
-import Numero from '../components/Numero';
-import Anillo from '../components/Anillo';
 import { traducirError } from '../lib/indicadores';
 import {
   getDashboard, getProcesos, getConfiguracionNotificaciones, mesReporteActual, exportarExcel, MESES, MESES_CORTO,
@@ -12,36 +10,65 @@ import {
 const { anio: ANIO_ACTUAL, mesActual: MES_ACTUAL } = mesReporteActual();
 
 const nivel = pct => (pct == null ? 'nada' : pct >= 85 ? 'alto' : pct >= 60 ? 'medio' : 'bajo');
+/** Para TEXTO se usa el dorado oscuro: el dorado de la marca sobre blanco no alcanza el contraste mínimo. */
+const colorTexto = { alto: 'var(--ok)', medio: 'var(--gold-ink)', bajo: 'var(--wine)', nada: 'var(--ink-3)' };
 const colorNivel = { alto: 'var(--ok)', medio: 'var(--gold)', bajo: 'var(--wine)', nada: 'var(--line-strong)' };
 const PALETA_TORTA = ['#A91D3A', '#C9932B', '#166534', '#4472C4', '#8064A2', '#2F9E4F', '#B5651D', '#7F7F7F'];
 
-/** Línea de evolución mensual del cumplimiento (datos reales), dibujada en SVG. */
-function Evolucion({ puntos }) {
-  const con = puntos.filter(p => p.pct != null);
-  if (con.length < 2) return null;
-  const W = 300, H = 92, px = 8, py = 12;
-  const x = m => px + ((m - 1) / 11) * (W - px * 2);
-  const vmin = Math.max(0, Math.min(...con.map(p => p.pct)) - 8), vmax = Math.min(100, Math.max(...con.map(p => p.pct)) + 8);
-  const y = v => py + (1 - (v - vmin) / Math.max(1, vmax - vmin)) * (H - py * 2);
-  const linea = con.map(p => `${x(p.mes).toFixed(1)},${y(p.pct).toFixed(1)}`).join(' ');
-  const area = `${x(con[0].mes)},${H - py} ${linea} ${x(con[con.length - 1].mes)},${H - py}`;
-  const ult = con[con.length - 1];
+/** Mapa del año: cada fila es un proceso (o un indicador, si ya se filtró un proceso) y cada columna un mes. */
+const TEXTO_ESTADO = { cumple: 'cumple la meta', incumple: 'no alcanzó la meta', nodilig: 'venció sin registrar', sinmeta: 'registrado, sin meta para evaluar', abierto: 'mes abierto' };
+
+/** Todos los indicadores del filtro actual, con su meta, último dato, cumplimiento y estado de cada mes. */
+function TablaIndicadores({ tabla, anio }) {
+  const [orden, setOrden] = useState('orden');
+  const filas = useMemo(() => {
+    const t = [...tabla];
+    if (orden === 'menor') t.sort((a, b) => (a.pct ?? 999) - (b.pct ?? 999));
+    else if (orden === 'mayor') t.sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
+    else if (orden === 'nombre') t.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    else if (orden === 'proceso') t.sort((a, b) => a.proceso.localeCompare(b.proceso, 'es') || a.orden - b.orden);
+    return t;
+  }, [tabla, orden]);
   return (
-    <figure className="hero-evol" aria-label={`Evolución mensual del cumplimiento hasta ${MESES[ult.mes - 1].toLowerCase()}`}>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img">
-        <polygon points={area} className="evol-area" />
-        <polyline points={linea} className="evol-linea" />
-        {con.map(p => <circle key={p.mes} cx={x(p.mes)} cy={y(p.pct)} r={p.mes === ult.mes ? 4 : 2.2} className={p.mes === ult.mes ? 'evol-ult' : 'evol-pt'}><title>{`${MESES[p.mes - 1]}: ${p.pct}%`}</title></circle>)}
-      </svg>
-      <figcaption><span>{MESES_CORTO[con[0].mes - 1]}</span><span>{MESES_CORTO[ult.mes - 1]}: {ult.pct}%</span></figcaption>
-    </figure>
+    <section className="panel" aria-labelledby="tabla-todos">
+      <div className="panel-header">
+        <div><h2 id="tabla-todos">Todos los indicadores</h2><p className="sub">{tabla.length} indicador{tabla.length === 1 ? '' : 'es'} con su meta, último dato y estado mes a mes.</p></div>
+        <label className="campo-lateral">Ordenar por
+          <select value={orden} onChange={e => setOrden(e.target.value)}>
+            <option value="orden">Orden del libro</option><option value="menor">Cumplimiento: menor primero</option><option value="mayor">Cumplimiento: mayor primero</option>
+            <option value="proceso">Proceso</option><option value="nombre">Nombre</option>
+          </select>
+        </label>
+      </div>
+      <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla de todos los indicadores: usa las flechas del teclado para moverte">
+        <table className="tabla-todos">
+          <thead><tr><th>Indicador</th><th>Meta</th><th>Último dato</th><th>Cumplimiento</th><th>Meses</th><th>Sin diligenciar</th><th>Sin plan</th></tr></thead>
+          <tbody>
+            {filas.map(f => (
+              <tr key={f.id}>
+                <td className="celda-principal">
+                  <Link to={`/indicadores/${f.id}?anio=${anio}`}>{f.nombre}</Link>
+                  <span className="celda-sub texto-tenue">{f.proceso}</span>
+                  <span className="celda-sub"><i className="punto-pilar" style={{ background: f.pilarColor || 'var(--line-strong)' }} aria-hidden="true"></i>{f.pilar} <span className="texto-tenue">({f.tipo})</span></span>
+                </td>
+                <td>{f.meta}{f.metaMensual && f.metaMensual !== '—' ? <span className="celda-sub texto-tenue">Mensual: {f.metaMensual}</span> : null}</td>
+                <td>{f.ultimo ? <>{f.ultimo.texto}<span className="celda-sub texto-tenue">{MESES[f.ultimo.mes - 1]}</span></> : <span className="texto-tenue">Sin datos</span>}</td>
+                <td>{f.pct == null ? <span className="texto-tenue">—</span> : <><strong className={`nivel-${nivel(f.pct)}`}>{f.pct} %</strong><span className="celda-sub texto-tenue">{f.cumplen} de {f.evaluados} meses</span></>}</td>
+                <td><span className="mini-meses" role="img" aria-label={f.estados.map(e => `${MESES[e.mes - 1]}: ${TEXTO_ESTADO[e.estado]}`).join('; ')}>{f.estados.map(e => <i key={e.mes} className={`e-${e.estado}`} title={`${MESES[e.mes - 1]}: ${TEXTO_ESTADO[e.estado]}`} />)}</span></td>
+                <td>{f.noDilig ? <strong className="texto-aten">{f.noDilig}</strong> : <span className="texto-tenue">0</span>}</td>
+                <td>{f.sinPlan ? <strong className="texto-mal">{f.sinPlan}</strong> : <span className="texto-tenue">0</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
-/** Mapa del año: cada fila es un proceso (o un indicador, si ya se filtró un proceso) y cada columna un mes. */
 function MapaAnio({ matriz, anio, tipo }) {
   return (
-    <div className="tabla-scroll">
+    <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte">
       <div className="mapa" role="table" aria-label={`Cumplimiento por ${tipo === 'indicadores' ? 'indicador' : 'proceso'} y mes, ${anio}`}>
         <div className="mapa-fila mapa-cab" role="row">
           <div role="columnheader" className="mapa-nombre" />
@@ -57,7 +84,7 @@ function MapaAnio({ matriz, anio, tipo }) {
                 : tipo === 'indicadores' ? (c.pct === 100 ? 'Cumple la meta' : 'No cumple la meta') : `${c.cumplidos} de ${c.evaluados} indicadores cumplen`;
               return (
                 <div role="cell" key={c.mes} className={`mapa-celda n-${n}${tipo === 'indicadores' ? ' mapa-celda-valor' : ''}`}
-                  style={{ '--i': r * 12 + c.mes }} title={`${f.label}, ${MESES[c.mes - 1]}: ${texto}`}>
+                  style={{ '--i': r * 12 + c.mes, '--f': r, '--c': c.mes }} title={`${f.label}, ${MESES[c.mes - 1]}: ${texto}`}>
                   {!c.futuro && !c.fuera && c.pct != null ? (tipo === 'indicadores' ? (c.valorTexto ?? c.pct) : c.pct) : ''}
                 </div>
               );
@@ -160,9 +187,9 @@ function Torta({ d, anio }) {
               labels: t.partes.map(p => p.label), colors: colores, legend: { show: false },
               stroke: { width: 2, colors: ['#fff'] },
               dataLabels: { enabled: true, formatter: v => `${Math.round(v)}%`, dropShadow: { enabled: false }, style: { fontSize: '11px', fontWeight: 700 } },
-              plotOptions: { pie: { donut: { size: '62%', labels: { show: true, name: { show: true, fontSize: '12px', color: '#7C847F' },
+              plotOptions: { pie: { donut: { size: '62%', labels: { show: true, name: { show: true, fontSize: '12px', color: '#59615C' },
                 value: { show: true, fontSize: '26px', fontWeight: 800, color: '#1C2321' },
-                total: { show: true, showAlways: true, label: 'incumplimientos', fontSize: '12px', color: '#7C847F', formatter: () => t.total } } } } },
+                total: { show: true, showAlways: true, label: 'incumplimientos', fontSize: '12px', color: '#59615C', formatter: () => t.total } } } } },
               tooltip: { y: { formatter: v => `${v} registro${v !== 1 ? 's' : ''}` } },
             }}
           />
@@ -197,7 +224,7 @@ function FilaBarra({ a }) {
         <div className="mini-barra" title={`${a.pct ?? '—'}% de cumplimiento`}><div className="mini-barra-relleno" style={{ width: `${a.pct ?? 0}%`, background: colorNivel[nivel(a.pct)] }} /></div>
         <div className="mini-barra mini-barra-sec" title={`${a.pctDiligencia ?? '—'}% diligenciado`}><div className="mini-barra-relleno" style={{ width: `${a.pctDiligencia ?? 0}%`, background: 'var(--f-500)', opacity: .35 }} /></div>
       </div>
-      <div className="area-fila-cifra num" style={{ color: colorNivel[nivel(a.pct)] }}>{a.pct == null ? '—' : `${a.pct}%`}</div>
+      <div className="area-fila-cifra num" style={{ color: colorTexto[nivel(a.pct)] }}>{a.pct == null ? '—' : `${a.pct}%`}</div>
     </li>
   );
 }
@@ -210,7 +237,7 @@ function Ranking({ lista, anio, alerta }) {
         <li key={i.id}>
           <span className={`ranking-pos${alerta ? ' ranking-pos-alerta' : ''}`}>{n + 1}</span>
           <Link to={`/indicadores/${i.id}?anio=${anio}`} className="ranking-nombre"><strong title={i.nombre}>{i.nombre}</strong><span>{i.proceso}</span></Link>
-          <span className="ranking-pct num" style={{ color: colorNivel[nivel(i.pct)] }}>{i.pct}%</span>
+          <span className="ranking-pct num" style={{ color: colorTexto[nivel(i.pct)] }}>{i.pct}%</span>
         </li>
       ))}
     </ol>
@@ -224,12 +251,12 @@ export default function Dashboard() {
   const [procesoId, setProcesoId] = useState('');
   const [desde, setDesde] = useState(1);
   const [hasta, setHasta] = useState(corte);
-  const [diaCierre, setDiaCierre] = useState(12);
+  const [diaCierre, setDiaCierre] = useState(15);
   const [d, setD] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => { getProcesos().then(setProcesos).catch(() => {}); getConfiguracionNotificaciones().then(c => setDiaCierre(c?.dia_cierre ?? 12)).catch(() => {}); }, []);
+  useEffect(() => { getProcesos().then(setProcesos).catch(() => {}); getConfiguracionNotificaciones().then(c => setDiaCierre(c?.dia_cierre ?? 15)).catch(() => {}); }, []);
   useEffect(() => { setHasta(corte); setDesde(1); }, [anio, corte]);
 
   useEffect(() => {
@@ -275,16 +302,30 @@ export default function Dashboard() {
 
   return (
     <div className="page">
+      <div className="membrete-impresion" aria-hidden="true">
+        <img src="/logo.png" alt="" height="54" />
+        <div><strong>Indicadores de Gestión · Dashboard {anio}</strong><span>{nombreProceso}, de {MESES[(d?.desde ?? desde) - 1].toLowerCase()} a {MESES[(d?.hasta ?? hasta) - 1].toLowerCase()}. Generado el {new Intl.DateTimeFormat('es-CO', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())}.</span></div>
+      </div>
       <PageHeader
         migas={[{ texto: 'Administración' }, { texto: 'Dashboard' }]}
         titulo="Dashboard"
-        descripcion={`${nombreProceso}, de ${MESES[(d?.desde ?? desde) - 1].toLowerCase()} a ${MESES[(d?.hasta ?? hasta) - 1].toLowerCase()} de ${anio}.`}
+        descripcion={`${nombreProceso}, de ${MESES[(d?.desde ?? desde) - 1].toLowerCase()} a ${MESES[(d?.hasta ?? hasta) - 1].toLowerCase()} de ${anio}.${d?.actualizadoEn ? ` Datos actualizados el ${new Intl.DateTimeFormat('es-CO', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(d.actualizadoEn))}.` : ''}`}
+        cifras={d ? [
+          { titulo: 'Cumplimiento de la meta', valor: d.pctGlobal, sufijo: '%', principal: true, tono: d.pctGlobal == null ? '' : d.pctGlobal >= 85 ? 'bien' : d.pctGlobal >= 60 ? 'aten' : 'mal',
+            nota: variacion ? `${variacion.actual - variacion.previo > 0 ? '+' : ''}${variacion.actual - variacion.previo} pts frente a ${variacion.mesNombre.toLowerCase()}` : `${d.totalIndicadores} indicadores en ${d.totalProcesos} proceso${d.totalProcesos !== 1 ? 's' : ''}` },
+          { titulo: 'Diligenciamiento', valor: d.pctDiligencia, sufijo: '%', nota: 'de los registros esperados' },
+          { titulo: 'Meses sin diligenciar', valor: d.faltantes, tono: d.faltantes ? 'aten' : '', nota: 'meses vencidos sin dato' },
+          { titulo: 'Incumplen sin plan', valor: d.sinPlan, tono: d.sinPlan ? 'mal' : '', nota: d.sinPlan ? 'falta la acción correctiva' : 'todo con plan definido' },
+        ] : null}
       >
         <label className="sr-only" htmlFor="anio-dash">Año</label>
         <select id="anio-dash" value={anio} onChange={e => setAnio(Number(e.target.value))}>
           {[ANIO_ACTUAL, ANIO_ACTUAL - 1, ANIO_ACTUAL - 2].map(a => <option key={a} value={a}>{a}</option>)}
         </select>
-        <button className="btn-secondary" onClick={descargar} disabled={!d}><i className="fa-solid fa-file-excel"></i> Exportar a Excel</button>
+        <div className="fila-botones">
+          <button className="btn-secondary" onClick={descargar} disabled={!d} aria-label="Exportar a Excel"><i className="fa-solid fa-file-excel" aria-hidden="true"></i> Excel</button>
+          <button type="button" className="btn-secondary" onClick={() => window.print()} aria-label="Descargar PDF"><i className="fa-solid fa-file-pdf" aria-hidden="true"></i> PDF</button>
+        </div>
       </PageHeader>
 
       <div className="barra-filtros filtros-dash" role="group" aria-label="Filtros del dashboard">
@@ -316,25 +357,6 @@ export default function Dashboard() {
         </div>
       ) : d && (
         <div className={cargando ? 'recalculando' : ''}>
-          <section className="hero-dash" aria-label="Resumen">
-            <div className="hero-principal">
-              <span className="hero-etiqueta">Cumplimiento de la meta</span>
-              <strong className="hero-cifra">{d.pctGlobal == null ? '—' : <><Numero valor={d.pctGlobal} /><small>%</small></>}</strong>
-              {variacion ? <Delta {...variacion} /> : <span className="hero-delta">{d.totalIndicadores} indicadores en {d.totalProcesos} proceso{d.totalProcesos !== 1 ? 's' : ''}</span>}
-              <Evolucion puntos={d.evolucion.filter(e => !e.futuro && !e.fuera && !e.abierto)} />
-            </div>
-            <dl className="hero-datos">
-              <div className="hero-anillo"><Anillo valor={d.pctDiligencia} tamano={86} grosor={9} etiqueta="Diligenciamiento" /><span><dt>Diligenciamiento</dt><small>de los registros esperados</small></span></div>
-              <div><dt>Meses sin diligenciar</dt><dd className={d.faltantes ? 'aten' : ''}><Numero valor={d.faltantes} /></dd><small>meses vencidos sin dato</small></div>
-              <div><dt>Incumplen sin plan</dt><dd className={d.sinPlan ? 'alerta' : ''}><Numero valor={d.sinPlan} /></dd><small>{d.sinPlan ? 'falta la acción correctiva' : 'todo con plan definido'}</small></div>
-            </dl>
-          </section>
-
-          <div className="rejilla-dash rejilla-igual">
-            <Acumulado d={d} />
-            <Torta d={d} anio={anio} />
-          </div>
-
           <section className="panel">
             <div className="panel-header">
               <div><h2>Mapa del año</h2>
@@ -350,35 +372,38 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <div className="rejilla-dash">
-            <section className="panel">
-              <div className="panel-header"><h2>Evolución del cumplimiento</h2><span className="sub">{nombreProceso}</span></div>
-              <Chart
-                type="area" height={300}
-                series={[{ name: 'Cumplimiento', data: d.evolucion.map(e => (e.futuro || e.fuera ? null : e.pct)) }]}
-                options={{
-                  chart: { toolbar: { show: false }, fontFamily: 'inherit', animations: { enabled: true, speed: 500 } },
-                  colors: ['#166534'], stroke: { curve: 'smooth', width: 2.5 },
-                  fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: .22, opacityTo: 0, stops: [0, 100] } },
-                  markers: { size: 4, strokeWidth: 2, strokeColors: '#fff', colors: ['#166534'], hover: { size: 6 } },
-                  dataLabels: { enabled: false },
-                  xaxis: { categories: MESES_CORTO, labels: { style: { fontSize: '12px', colors: '#7C847F' } }, axisBorder: { show: false }, axisTicks: { show: false } },
-                  yaxis: { min: 0, max: 100, tickAmount: 4, labels: { formatter: v => `${Math.round(v)}%`, style: { fontSize: '12px', colors: '#7C847F' } } },
-                  grid: { borderColor: '#EFEDE6', strokeDashArray: 0, padding: { left: 4, right: 8 } },
-                  tooltip: { theme: 'light', y: { formatter: v => (v == null ? 'Sin datos' : `${v}% de los indicadores cumplen`) } },
-                }}
-              />
+          <div className="rejilla-dash rejilla-igual">
+            <Acumulado d={d} />
+            <Torta d={d} anio={anio} />
+          </div>
+
+
+          <section className="panel">
+            <div className="panel-header"><h2>Evolución del cumplimiento</h2><span className="sub">{nombreProceso}</span></div>
+            <Chart
+              type="area" height={340}
+              series={[{ name: 'Cumplimiento', data: d.evolucion.map(e => (e.futuro || e.fuera ? null : e.pct)) }]}
+              options={{
+                chart: { toolbar: { show: false }, fontFamily: 'inherit', animations: { enabled: true, speed: 500 } },
+                colors: ['#166534'], stroke: { curve: 'smooth', width: 2.5 },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: .22, opacityTo: 0, stops: [0, 100] } },
+                markers: { size: 4, strokeWidth: 2, strokeColors: '#fff', colors: ['#166534'], hover: { size: 6 } },
+                dataLabels: { enabled: false },
+                xaxis: { categories: MESES_CORTO, labels: { style: { fontSize: '12px', colors: '#59615C' } }, axisBorder: { show: false }, axisTicks: { show: false } },
+                yaxis: { min: 0, max: 100, tickAmount: 4, labels: { formatter: v => `${Math.round(v)}%`, style: { fontSize: '12px', colors: '#59615C' } } },
+                grid: { borderColor: '#EFEDE6', strokeDashArray: 0, padding: { left: 4, right: 8 } },
+                tooltip: { theme: 'light', y: { formatter: v => (v == null ? 'Sin datos' : `${v}% de los indicadores cumplen`) } },
+              }}
+            />
+          </section>
+          <div className="rejilla-dos">
+            <section className="panel" aria-labelledby="por-pilar">
+              <div className="panel-header"><div><h2 id="por-pilar">Por pilar de la estrategia ASG</h2><p className="sub">Cumplimiento de la meta en los indicadores de cada pilar.</p></div></div>
+              <ul className="lista-areas">{d.porPilar.map(a => <FilaBarra key={a.clave} a={a} />)}</ul>
             </section>
-            <section className="panel">
-              <div className="panel-header"><div><h2>Por categoría</h2><p className="sub">Con los colores del Excel.</p></div></div>
-              {d.porCategoria.length === 1 && d.porCategoria[0].clave === '__sin_categoria__' ? (
-                <div className="estado-vacio" style={{ padding: 'var(--s-5) 0' }}>
-                  <i className="fa-solid fa-tags"></i>
-                  <strong>Los indicadores aún no tienen categoría</strong>
-                  <p>Asígnala en Configuración, pestaña Indicadores, y aquí verás qué categorías cumplen más.</p>
-                  <Link className="btn-secondary" to="/configuracion">Ir a Configuración</Link>
-                </div>
-              ) : <ul className="lista-areas">{d.porCategoria.map(a => <FilaBarra key={a.clave} a={a} />)}</ul>}
+            <section className="panel" aria-labelledby="por-tipo">
+              <div className="panel-header"><div><h2 id="por-tipo">Por tipo de indicador</h2><p className="sub">Cumplimiento, eficiencia y eficacia.</p></div></div>
+              <ul className="lista-areas">{d.porTipo.map(a => <FilaBarra key={a.clave} a={a} />)}</ul>
             </section>
           </div>
 
@@ -392,6 +417,7 @@ export default function Dashboard() {
               <Ranking lista={d.mejores} anio={anio} />
             </section>
           </div>
+          <TablaIndicadores tabla={d.tabla} anio={anio} />
         </div>
       )}
     </div>

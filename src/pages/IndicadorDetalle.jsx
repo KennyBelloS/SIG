@@ -3,14 +3,15 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useSesion } from '../lib/useSesion';
 import IndicadorChart, { TendenciaChart } from '../components/IndicadorChart';
 import PageHeader from '../components/PageHeader';
+import { usaComponentes, etiquetasDe, calcularValor, motivoSinCalculo, CALCULOS } from '../lib/calculo';
 import { traducirError } from '../lib/indicadores';
 import { avisar } from '../lib/toast';
-import Dialogo from '../components/Dialogo';
+import Dialogo, { Confirmar } from '../components/Dialogo';
 import {
   getIndicador, getRegistrosMultiAnio, guardarRegistro, sugerirPlanAccion, cumpleMeta,
   formatearValor, formatearMeta, mesReporteActual, MESES, getProcesos, getCierresDelAnio,
   esPorcentaje, entradaAValor, valorAEntrada, estadisticasIndicador, desviacionVsMeta, exportarExcel, metaDelMes,
-  estaCerrado, getConfiguracionNotificaciones, MESES_CORTO, formatearMetaMensual, tipoMetaEfectivo,
+  estaCerrado, getConfiguracionNotificaciones, MESES_CORTO, formatearMetaMensual, tipoMetaEfectivo, reabrirMes,
 } from '../lib/indicadores';
 
 export default function IndicadorDetalle() {
@@ -32,7 +33,8 @@ export default function IndicadorDetalle() {
   const [hastaG, setHastaG] = useState(12);
   const [errorForm, setErrorForm] = useState(null);
   const [cierres, setCierres] = useState([]);
-  const [diaCierre, setDiaCierre] = useState(12);
+  const [reabriendo, setReabriendo] = useState(false);
+  const [diaCierre, setDiaCierre] = useState(15);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [mesAbierto, setMesAbierto] = useState(null);
@@ -45,9 +47,9 @@ export default function IndicadorDetalle() {
       const anios = [...new Set([anio, anio - 1, ...(comparar ? [Number(comparar)] : [])])];
       const [ind, regsMulti, procesos, cierresAnio, cfg] = await Promise.all([
         getIndicador(id), getRegistrosMultiAnio(id, anios), getProcesos(), getCierresDelAnio(anio),
-        getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 12 })),
+        getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 15 })),
       ]);
-      setDiaCierre(cfg?.dia_cierre ?? 12);
+      setDiaCierre(cfg?.dia_cierre ?? 15);
       setIndicador(ind);
       setRegistros(regsMulti.filter(r => r.anio === anio));
       setRegistrosComparacion(comparar ? regsMulti.filter(r => r.anio === Number(comparar)) : []);
@@ -81,6 +83,7 @@ export default function IndicadorDetalle() {
     setMesAbierto(mes);
     setForm({
       valor: valorAEntrada(indicador, reg?.valor),
+      a: reg?.componentes?.a ?? '', b: reg?.componentes?.b ?? '',
       analisis: reg?.analisis ?? '',
       causa: reg?.causa ?? '',
       accion: reg?.accion ?? '',
@@ -89,9 +92,15 @@ export default function IndicadorDetalle() {
     });
   }
 
+  /** El resultado del formulario: el que sale de los dos números (si el indicador se calcula y ya están) o el digitado. */
+  function valorDelFormulario() {
+    const calc = usaComponentes(indicador) ? calcularValor(indicador, { a: form.a, b: form.b }) : null;
+    return calc != null ? calc : entradaAValor(indicador, form.valor);
+  }
+
   function sugerir() {
     const valorMesAnterior = porMes.get(mesAbierto - 1)?.valor;
-    const sugerencia = sugerirPlanAccion({ indicador, procesoClave, valor: entradaAValor(indicador, form.valor), mes: mesAbierto, valorMesAnterior });
+    const sugerencia = sugerirPlanAccion({ indicador, procesoClave, valor: valorDelFormulario(), mes: mesAbierto, valorMesAnterior });
     setForm(f => ({ ...f, analisis: sugerencia.analisis || f.analisis, causa: sugerencia.causa || f.causa, accion: sugerencia.accion || f.accion }));
   }
 
@@ -99,19 +108,24 @@ export default function IndicadorDetalle() {
     e.preventDefault();
     setErrorForm(null);
     // Reglas de negocio: el valor y el plan de acción son siempre obligatorios.
-    if (form.valor === '' || form.valor == null) { setErrorForm('Escribe el valor del indicador.'); return; }
+    const porComp = usaComponentes(indicador);
+    const algunNumero = String(form.a ?? '') !== '' || String(form.b ?? '') !== '';
+    const calc = porComp ? calcularValor(indicador, { a: form.a, b: form.b }) : null;
+    if (porComp && algunNumero && calc == null) { setErrorForm(motivoSinCalculo(indicador, { a: form.a, b: form.b }) || `Escribe los dos números (${etiquetasDe(indicador).a} y ${etiquetasDe(indicador).b}) o déjalos vacíos y escribe el resultado.`); return; }
+    if (calc == null && (form.valor === '' || form.valor == null)) { setErrorForm(porComp ? `Escribe los dos números para calcular el resultado, o escribe el resultado directamente.` : 'Escribe el valor del indicador.'); return; }
     if (!String(form.accion || '').trim()) { setErrorForm('El plan de acción es obligatorio, incluso cuando el indicador cumple.'); return; }
     setGuardando(true); setError(null);
     try {
       await guardarRegistro({
         indicador_id: Number(id), anio, mes: mesAbierto,
-        valor: entradaAValor(indicador, form.valor),
+        valor: valorDelFormulario(),
+        componentes: porComp && algunNumero && calc != null ? { a: Number(form.a), b: Number(form.b) } : null,
         analisis: form.analisis, causa: form.causa, accion: form.accion,
         responsable_accion: form.responsable_accion, fecha_compromiso: form.fecha_compromiso || null,
         plan_sugerido: false,
         registrado_por: sesion?.email,
       });
-      const cumple = cumpleMeta(indicador, entradaAValor(indicador, form.valor), mesAbierto);
+      const cumple = cumpleMeta(indicador, valorDelFormulario(), mesAbierto);
       const nombreMes = MESES[mesAbierto - 1];
       setMesAbierto(null);
       await cargar();
@@ -214,8 +228,8 @@ export default function IndicadorDetalle() {
             const clase = reg?.valor == null ? (cerrado ? 'perdido' : 'pendiente') : cumple ? 'cumple' : 'incumple';
             return (
               <button key={mes} type="button" onClick={() => abrirMes(mes)}
-                className={`mes-gr mes-gr-${clase}${anio === anioActual && mes === mesHoy ? ' es-actual' : ''}`}
-                aria-label={`${nombreMes}: ${reg?.valor == null ? (cerrado ? 'venció sin registrar' : 'sin registrar') : (cumple ? 'cumple' : 'no cumple') + ', ' + formatearValor(indicador, reg.valor)}${cerrado ? ', mes cerrado' : ''}`}>
+                className={`mes-gr mes-gr-${clase}${anio === anioActual && mes === mesHoy ? ' es-actual' : ''}`}>
+                <span className="sr-only">{`${nombreMes}: ${reg?.valor == null ? (cerrado ? 'venció sin registrar' : 'sin registrar') : (cumple ? 'cumple' : 'no cumple') + ', ' + formatearValor(indicador, reg.valor)}${cerrado ? ', mes cerrado' : ''}`}. </span>
                 <span className="mes-gr-valor">{reg?.valor == null ? (cerrado ? '—' : '·') : formatearValor(indicador, reg.valor)}</span>
                 <span className="mes-gr-nombre">{MESES_CORTO[i]}{cerrado && <i className="fa-solid fa-lock" aria-hidden="true"></i>}</span>
               </button>
@@ -260,6 +274,13 @@ export default function IndicadorDetalle() {
             <strong className="card-valor" style={{ color: stats.mesesPendientes > 0 ? 'var(--alerta)' : 'var(--ok)' }}>{stats.mesesPendientes}</strong>
             <span className="card-sub">{stats.mesesConDato} de 12 diligenciados</span>
           </div>
+          {indicador.referencia_anterior && (indicador.referencia_anterior.meta || indicador.referencia_anterior.resultado) && (
+            <div className="card">
+              <span className="card-label">Cierre del año anterior</span>
+              <strong className="card-valor card-valor-texto">{indicador.referencia_anterior.resultado || '—'}</strong>
+              <span className="card-sub">Meta: {indicador.referencia_anterior.meta || '—'}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -332,7 +353,7 @@ export default function IndicadorDetalle() {
         <div className="panel-header">
           <h2>Análisis y plan de acción</h2>
         </div>
-        <div className="tabla-scroll"><table className="tabla-apilable">
+        <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte"><table className="tabla-apilable">
           <thead><tr><th>Mes</th><th>Valor</th><th>Meta</th><th>Desviación</th><th>Estado</th><th>Análisis</th><th>Plan de acción</th><th></th></tr></thead>
           <tbody>
             {MESES.map((nombreMes, i) => {
@@ -344,7 +365,7 @@ export default function IndicadorDetalle() {
               const desv = reg?.valor != null ? desviacionVsMeta(indicador, reg.valor, mes) : null;
               return (
                 <tr key={mes}>
-                  <td className="celda-principal">{nombreMes} {cerrado && <i className="fa-solid fa-lock" title="Mes cerrado" aria-label="Mes cerrado" style={{ color: 'var(--ink-3)', marginLeft: 4, fontSize: 11 }}></i>}</td>
+                  <td className="celda-principal">{nombreMes} {cerrado && <i className="fa-solid fa-lock" role="img" title="Mes cerrado" aria-label="Mes cerrado" style={{ color: 'var(--ink-3)', marginLeft: 4, fontSize: 11 }}></i>}</td>
                   <td data-label="Valor" className="celda-numero">{formatearValor(indicador, reg?.valor)}</td>
                   <td data-label="Meta" className="celda-numero celda-tenue">{formatearValor(indicador, metaDelMes(indicador, mes))}</td>
                   <td data-label="Desviación" className="celda-numero">
@@ -353,7 +374,8 @@ export default function IndicadorDetalle() {
                   <td data-label="Estado"><span className={`chip-ind ${estado === 'Cumple' ? 'chip-ind-ok' : estado === 'No cumple' ? 'chip-ind-no' : 'chip-ind-pendiente'}`}>{estado}</span></td>
                   <td data-label="Análisis" className="celda-texto">{reg?.analisis || '—'}</td>
                   <td data-label="Plan de acción" className="celda-texto">{reg?.accion ? <>{reg.accion}{reg.plan_sugerido && <em className="nota-sugerido">Sugerido por el sistema</em>}</> : '—'}</td>
-                  <td data-label=""><button className="btn-secondary btn-chico" onClick={() => abrirMes(mes)} aria-label={`${!sesion?.puedeRegistrar ? 'Ver' : reg?.valor == null ? 'Registrar' : 'Editar'} ${nombreMes}`}>{!sesion?.puedeRegistrar ? 'Ver' : reg?.valor == null ? 'Registrar' : 'Editar'}</button></td>
+                  <td data-label="">{(() => { const verSolo = cerrado || !sesion?.puedeRegistrar; const verbo = verSolo ? 'Ver' : reg?.valor == null ? 'Registrar' : 'Editar';
+                    return <button className="btn-secondary btn-chico" onClick={() => abrirMes(mes)} aria-label={`${verbo} ${nombreMes}${cerrado ? ' (mes cerrado)' : ''}`}>{cerrado && <i className="fa-solid fa-lock" aria-hidden="true"></i>} {verbo}</button>; })()}</td>
                 </tr>
               );
             })}
@@ -364,16 +386,47 @@ export default function IndicadorDetalle() {
       {mesAbierto && (
         <Dialogo titulo={`${MESES[mesAbierto - 1]} ${anio}`} onCerrar={() => setMesAbierto(null)}>
           <form className="form-dialogo" onSubmit={puedeEditarMes ? guardar : e => e.preventDefault()}>
-            <h2>{MESES[mesAbierto - 1]} {anio}</h2>
+            <h2>{MESES[mesAbierto - 1]} {anio}{mesCerrado && <span className="titulo-cerrado"><i className="fa-solid fa-lock" aria-hidden="true"></i> Cerrado</span>}</h2>
             {!sesion?.puedeRegistrar && (
               <div className="aviso aviso-info" style={{ marginTop: 0 }}><i className="fa-solid fa-eye"></i><span>Tu rol es de consulta: puedes ver este mes, pero no registrarlo ni editarlo.</span></div>
             )}
             {mesCerrado && (
-              <div className="alert" style={{ background: '#FEF3C7', color: '#92400E' }}>
-                <i className="fa-solid fa-lock"></i> Este mes está cerrado y no se puede editar.{sesion?.esAdmin ? ' Reábrelo en Configuración → Cierres mensuales para poder editarlo.' : ' Pide a un administrador que lo reabra en Configuración.'}
+              <div className="aviso-cerrado" role="note">
+                <i className="fa-solid fa-lock" aria-hidden="true"></i>
+                <div>
+                  <strong>Este mes está cerrado: solo se puede ver.</strong>
+                  <p>Pasó el último día para registrarlo ({diaCierre} del mes siguiente). Así los resultados que ya se reportaron no cambian por error. {sesion?.esAdmin ? 'Como administrador puedes reabrirlo; quedará anotado quién lo hizo.' : 'Si hace falta corregirlo, pide a un administrador que lo reabra.'}</p>
+                  {sesion?.esAdmin && <button type="button" className="btn-secondary btn-chico" onClick={() => setReabriendo(true)}><i className="fa-solid fa-lock-open" aria-hidden="true"></i> Reabrir este mes</button>}
+                </div>
               </div>
             )}
             <fieldset disabled={!puedeEditarMes} style={{ border: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {usaComponentes(indicador) ? (() => {
+                const e = etiquetasDe(indicador), calc = calcularValor(indicador, { a: form.a, b: form.b }), motivo = motivoSinCalculo(indicador, { a: form.a, b: form.b });
+                const cumple = calc != null ? cumpleMeta(indicador, calc, mesAbierto) : null;
+                return (
+                  <div className="calculo-bloque">
+                    <p className="calculo-formula"><i className="fa-solid fa-calculator" aria-hidden="true"></i> Este indicador se calcula: <strong>{CALCULOS[indicador.calculo].formula.replaceAll('Año anterior', e.a).replaceAll('Año actual', e.b).replaceAll('Planeadas', e.a).replaceAll('Ejecutadas', e.b).replaceAll('Numerador', e.a).replaceAll('Denominador', e.b)}</strong></p>
+                    <div className="calculo-numeros">
+                      <label>{e.a}<input type="number" step="any" inputMode="decimal" autoFocus value={form.a} onChange={ev => setForm(f => ({ ...f, a: ev.target.value }))} /></label>
+                      <label>{e.b}<input type="number" step="any" inputMode="decimal" value={form.b} onChange={ev => setForm(f => ({ ...f, b: ev.target.value }))} /></label>
+                    </div>
+                    <div className={`calculo-resultado${cumple === true ? ' ok' : cumple === false ? ' mal' : ''}`} role="status" aria-live="polite">
+                      <span>Resultado</span>
+                      <strong>{calc != null ? formatearValor(indicador, calc) : '—'}</strong>
+                      <small>{calc != null ? `${cumple === true ? 'Cumple' : cumple === false ? 'No cumple' : 'Sin meta para evaluar'} · Meta ${formatearMeta(indicador)}` : (motivo || `Escribe los dos números y el resultado se calcula solo. Meta: ${formatearMeta(indicador)}.`)}</small>
+                    </div>
+                    {calc == null && (
+                      <label className="calculo-directo">…o escribe el resultado directamente
+                        <div className="campo-con-sufijo">
+                          <input type="number" step="any" value={form.valor} onChange={ev => setForm(f => ({ ...f, valor: ev.target.value }))} placeholder="Solo si no tienes los dos números" />
+                          <span className="sufijo">{esPorcentaje(indicador) ? '%' : (indicador.unidad_medida || '')}</span>
+                        </div>
+                      </label>
+                    )}
+                  </div>
+                );
+              })() : (
               <label>Valor del indicador
                 <div className="campo-con-sufijo">
                   <input
@@ -390,6 +443,7 @@ export default function IndicadorDetalle() {
                     : `Meta: ${formatearMeta(indicador)}.`}
                 </small>
               </label>
+              )}
               <label>Análisis de cumplimiento
                 <textarea rows={3} value={form.analisis} onChange={e => setForm(f => ({ ...f, analisis: e.target.value }))} />
               </label>
@@ -417,6 +471,15 @@ export default function IndicadorDetalle() {
             </div>
           </form>
         </Dialogo>
+      )}
+      {reabriendo && mesAbierto && (
+        <Confirmar titulo={`¿Reabrir ${MESES[mesAbierto - 1]} ${anio}?`} textoBoton="Reabrir el mes"
+          texto="Se podrá volver a registrar y editar este mes en todos los indicadores hasta que se cierre otra vez. Queda anotado en la auditoría quién lo reabrió."
+          onCancelar={() => setReabriendo(false)}
+          onConfirmar={async () => {
+            try { await reabrirMes({ anio, mes: mesAbierto, reabierto_por: sesion?.email }); avisar(`${MESES[mesAbierto - 1]} reabierto.`, { tipo: 'ok' }); await cargar(); }
+            catch (err) { avisar(traducirError(err), { tipo: 'alerta' }); } finally { setReabriendo(false); }
+          }} />
       )}
     </div>
   );

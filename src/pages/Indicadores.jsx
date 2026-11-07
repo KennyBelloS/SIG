@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSesion } from '../lib/useSesion';
 import PageHeader from '../components/PageHeader';
-import Numero from '../components/Numero';
-import Anillo from '../components/Anillo';
+import MapaMes from '../components/MapaMes';
 import { traducirError } from '../lib/indicadores';
 import { Confirmar } from '../components/Dialogo';
 import {
@@ -102,7 +101,7 @@ function PanelInvolucrados({ proceso, involucrados, onCambio }) {
 
   return (
     <div className="ind-involucrados">
-      <div className="tabla-scroll"><table>
+      <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte"><table>
         <thead><tr><th>Nombre</th><th>Cargo</th><th>Correo</th><th>Avisos</th><th></th></tr></thead>
         <tbody>
           {involucrados.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: '#8A8A7E' }}>Sin involucrados todavía.</td></tr>}
@@ -179,7 +178,6 @@ function ProcesoPanel({ proceso, indicadores, registros, statsPorIndicador, regi
       <button className="ind-proceso-header" onClick={() => setAbierto(a => !a)} aria-expanded={abierto}>
         <div className="ind-proceso-titulo">
           <i className={`fa-solid ${abierto ? 'fa-chevron-down' : 'fa-chevron-right'}`}></i>
-          <Anillo valor={indicadores.length ? Math.round(((indicadores.length - pendientes) / indicadores.length) * 100) : null} tamano={42} grosor={5} color={pendientes ? 'var(--gold)' : 'var(--ok)'} pista="var(--line)" centro={indicadores.length - pendientes} etiqueta={`Registrados en ${proceso.nombre}`} />
           <h2>{proceso.nombre}</h2>
           <span className="ind-proceso-conteo">{indicadores.length} indicador{indicadores.length !== 1 ? 'es' : ''}</span>
         </div>
@@ -192,7 +190,7 @@ function ProcesoPanel({ proceso, indicadores, registros, statsPorIndicador, regi
 
       {abierto && (
         <div className="ind-proceso-body">
-          <div className="tabla-scroll"><table className="tabla-apilable">
+          <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte"><table className="tabla-apilable">
             <thead><tr><th>Indicador</th><th>Responsable</th><th>Meta</th><th>{MESES[mes - 1]} {anio}</th><th>Estado</th><th>Año {anio}</th><th>% Incumpl.</th><th></th></tr></thead>
             <tbody>
               {filas.map(({ ind, reg, estado }) => (
@@ -251,19 +249,23 @@ export default function Indicadores() {
   const [statsPorIndicador, setStatsPorIndicador] = useState(new Map());
   const [registrosAnioPorInd, setRegistrosAnioPorInd] = useState(new Map());
   const [cierres, setCierres] = useState([]);
-  const [diaCierre, setDiaCierre] = useState(12);
+  const [diaCierre, setDiaCierre] = useState(15);
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
-  const [mes, setMes] = useState(MES_ACTUAL);
-  const [anio, setAnio] = useState(ANIO_ACTUAL);
+  // Abre en el mes que hoy se está reportando (el anterior, mientras siga abierto); si ya se cerró, en el mes actual.
+  const { anioReporte: ANIO_REP, mesReporte: MES_REP } = mesReporteActual();
+  const mesAbierto = d => (new Date().getDate() <= d ? { m: MES_REP, a: ANIO_REP } : { m: MES_ACTUAL, a: ANIO_ACTUAL });
+  const [mes, setMes] = useState(() => mesAbierto(15).m);
+  const [anio, setAnio] = useState(() => mesAbierto(15).a);
+  const eligioMes = useRef(false);
 
   async function cargarTodo() {
     setCargando(true); setError(null);
     try {
       const [listaProcesos, cierresAnio, cfg] = await Promise.all([
-        getProcesos(), getCierresDelAnio(anio), getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 12 })),
+        getProcesos(), getCierresDelAnio(anio), getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 15 })),
       ]);
-      setProcesos(listaProcesos); setCierres(cierresAnio); setDiaCierre(cfg?.dia_cierre ?? 12);
+      setProcesos(listaProcesos); setCierres(cierresAnio); setDiaCierre(cfg?.dia_cierre ?? 15);
 
       const indMap = new Map();
       const invMap = new Map();
@@ -293,6 +295,12 @@ export default function Indicadores() {
       setRegistrosAnioPorInd(porIndicador);
     } catch (err) { setError(traducirError(err)); } finally { setCargando(false); }
   }
+  useEffect(() => {
+    if (eligioMes.current) return;
+    const a = mesAbierto(diaCierre);
+    if (a.m !== mes || a.a !== anio) { setMes(a.m); setAnio(a.a); }
+    // eslint-disable-next-line
+  }, [diaCierre]);
   useEffect(() => { cargarTodo(); /* eslint-disable-next-line */ }, [mes, anio]);
 
   async function recargarInvolucrados() {
@@ -341,20 +349,26 @@ export default function Indicadores() {
         migas={[{ texto: 'Seguimiento' }, { texto: 'Indicadores' }]}
         titulo="Indicadores"
         descripcion="Registra el avance de cada mes y revisa qué indicadores alcanzaron su meta."
+        cifras={cargando ? null : [
+          { titulo: `Diligenciados en ${MESES[mes - 1]}`, valor: totalIndicadores - totalPendientes, sufijo: ` de ${totalIndicadores}`, principal: true, nota: `indicadores con dato en ${procesos.length} procesos` },
+          { titulo: 'Cumplen la meta', valor: totalCumplen, tono: 'bien', nota: 'de los ya registrados' },
+          { titulo: 'No cumplen', valor: totalNoCumplen, tono: totalNoCumplen ? 'mal' : '', nota: totalNoCumplen ? 'necesitan plan de acción' : 'ninguno por ahora' },
+          { titulo: 'Por registrar', valor: totalPendientes, tono: totalPendientes ? 'aten' : '', nota: totalPendientes ? 'esperan su dato del mes' : 'todo al día' },
+        ]}
       >
         <div className="selector-periodo" role="group" aria-label="Periodo">
-          <button className="btn-texto" onClick={() => { const m = mes === 1 ? 12 : mes - 1; setMes(m); if (mes === 1) setAnio(a => a - 1); }} title="Mes anterior" aria-label="Mes anterior">
+          <button className="btn-texto" onClick={() => { eligioMes.current = true; const m = mes === 1 ? 12 : mes - 1; setMes(m); if (mes === 1) setAnio(a => a - 1); }} title="Mes anterior" aria-label="Mes anterior">
             <i className="fa-solid fa-chevron-left"></i>
           </button>
           <div className="selector-periodo-actual" aria-live="polite">
             <strong>{MESES[mes - 1]}</strong>
             <span>{anio}</span>
           </div>
-          <button className="btn-texto" onClick={() => { const m = mes === 12 ? 1 : mes + 1; setMes(m); if (mes === 12) setAnio(a => a + 1); }} title="Mes siguiente" aria-label="Mes siguiente">
+          <button className="btn-texto" onClick={() => { eligioMes.current = true; const m = mes === 12 ? 1 : mes + 1; setMes(m); if (mes === 12) setAnio(a => a + 1); }} title="Mes siguiente" aria-label="Mes siguiente">
             <i className="fa-solid fa-chevron-right"></i>
           </button>
-          {(mes !== MES_ACTUAL || anio !== ANIO_ACTUAL) && (
-            <button className="btn-secondary" onClick={() => { setMes(MES_ACTUAL); setAnio(ANIO_ACTUAL); }}>Ir al mes actual</button>
+          {(mes !== mesAbierto(diaCierre).m || anio !== mesAbierto(diaCierre).a) && (
+            <button className="btn-secondary" onClick={() => { eligioMes.current = false; setMes(mesAbierto(diaCierre).m); setAnio(mesAbierto(diaCierre).a); }}>Ir al mes que se reporta</button>
           )}
         </div>
       </PageHeader>
@@ -363,22 +377,8 @@ export default function Indicadores() {
 
       {!cargando && (
         <>
-          <section className="hero-dash hero-compacto" aria-label={`Estado de ${MESES[mes - 1]}`}>
-            <div className="hero-principal">
-              <span className="hero-etiqueta">Diligenciados en {MESES[mes - 1]}</span>
-              <strong className="hero-cifra"><Numero valor={totalIndicadores - totalPendientes} /><small> de {totalIndicadores}</small></strong>
-              <div className="hero-progreso" role="progressbar" aria-label="Avance del mes" aria-valuemin={0} aria-valuemax={100}
-                aria-valuenow={totalIndicadores ? Math.round(((totalIndicadores - totalPendientes) / totalIndicadores) * 100) : 0}>
-                <span style={{ width: `${totalIndicadores ? ((totalIndicadores - totalPendientes) / totalIndicadores) * 100 : 0}%` }} />
-              </div>
-              <span className="hero-delta">indicadores con dato en {procesos.length} procesos</span>
-            </div>
-            <dl className="hero-datos">
-              <div><dt>Cumplen la meta</dt><dd><Numero valor={totalCumplen} /></dd><small>de los ya registrados</small></div>
-              <div><dt>No cumplen</dt><dd className={totalNoCumplen ? 'alerta' : ''}><Numero valor={totalNoCumplen} /></dd><small>{totalNoCumplen ? 'necesitan plan de acción' : 'ninguno por ahora'}</small></div>
-              <div><dt>Por registrar</dt><dd className={totalPendientes ? 'aten' : ''}><Numero valor={totalPendientes} /></dd><small>{totalPendientes ? 'esperan su dato del mes' : 'todo al día'}</small></div>
-            </dl>
-          </section>
+          <MapaMes procesos={procesos} indicadoresPorProceso={indicadoresPorProceso} registros={registros} mes={mes} anio={anio}
+            cerrado={estaCerrado(anio, mes, cierres, diaCierre)} onAbrir={id => navegar(`/indicadores/${id}?mes=${mes}&anio=${anio}`)} />
 
           <div className="barra-filtros">
             <div className="campo-busqueda">

@@ -71,14 +71,14 @@ export default function PrimerosPasos({ sesion, rol: rolProp }) {
         <div><h2>Empieza en {pasos.length} pasos</h2><p className="sub">Se marcan solos cuando la aplicación detecta que ya lo hiciste. Los demás los marcas tú.</p></div>
         <span className="pp-cuenta num">{listos}/{pasos.length}</span>
       </div>
-      <div className="pp-barra" role="progressbar" aria-valuemin={0} aria-valuemax={pasos.length} aria-valuenow={listos}><u style={{ width: `${(listos / pasos.length) * 100}%` }} /></div>
+      <div className="pp-barra" role="progressbar" aria-label="Avance de los primeros pasos" aria-valuemin={0} aria-valuemax={pasos.length} aria-valuenow={listos}><u style={{ width: `${(listos / pasos.length) * 100}%` }} /></div>
       <ul className="pp-lista">
         {pasos.map(p => {
           const a = auto[p.id]; const ok = hecho(p);
           return (
             <li key={p.id} className={ok ? 'ok' : ''}>
               {p.detectar && !cargando && a
-                ? <span className="pp-marca" aria-label={ok ? 'Hecho' : 'Pendiente'}><i className={`fa-solid ${ok ? 'fa-circle-check' : 'fa-circle'}`} /></span>
+                ? <span className="pp-marca" role="img" aria-label={ok ? 'Hecho' : 'Pendiente'}><i className={`fa-solid ${ok ? 'fa-circle-check' : 'fa-circle'}`} /></span>
                 : <button className="pp-marca" onClick={() => marcar(p.id)} aria-pressed={ok} aria-label={`${ok ? 'Desmarcar' : 'Marcar'}: ${p.texto}`}><i className={`fa-${ok ? 'solid' : 'regular'} ${ok ? 'fa-square-check' : 'fa-square'}`} /></button>}
               <div className="pp-txt"><b>{p.texto}</b><small>{a ? a.detalle : p.ayuda}</small></div>
               {p.ruta && <Link to={p.ruta} className="btn-texto" aria-label={`Ir a ${p.texto}`}><i className="fa-solid fa-arrow-up-right-from-square" /></Link>}

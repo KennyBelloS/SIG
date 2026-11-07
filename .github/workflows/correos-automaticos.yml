@@ -4,8 +4,8 @@
 # timbre" de la función de correos una vez al día. La función decide sola qué
 # toca enviar hoy (hora de Colombia):
 #   - el día del recordatorio (2 por defecto): correo a TODOS los procesos,
-#   - dos días antes del cierre: correo a quienes aún tienen pendientes,
-#   - el día del cierre (12 por defecto): se cierra el mes y se avisa a TODOS.
+#   - dos días antes del último día para registrar (13 por defecto): correo a quienes aún tienen pendientes,
+#   - el día siguiente al último día (16 por defecto, o sea después del 15): se cierra el mes y se avisa a TODOS.
 # Los demás días no hace nada, así que es seguro que corra a diario.
 #
 # Antes de usarlo, en GitHub: Settings -> Secrets and variables -> Actions ->

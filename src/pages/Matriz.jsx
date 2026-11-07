@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
-import Hero from '../components/Hero';
+import MatrizExcel from './MatrizExcel';
 import { traducirError } from '../lib/indicadores';
 import {
   getIndicadores, getProcesos, supabaseRegistrosAnio, getCierresDelAnio, getConfiguracionNotificaciones,
@@ -33,7 +33,7 @@ const etiquetaFrecuencia = f => FRECUENCIAS[f] || (f ? f : '—');
 
 /** Matriz principal: todos los indicadores activos en una sola tabla, mes a mes. Un indicador nuevo
  *  aparece aquí apenas se crea. */
-export default function Matriz() {
+function MatrizSeguimiento({ selectorVista }) {
   const navegar = useNavigate();
   const [anio, setAnio] = useState(ANIO_ACTUAL);
   const [procesoId, setProcesoId] = useState('');
@@ -46,8 +46,8 @@ export default function Matriz() {
     let vivo = true;
     setDatos(null); setError(null);
     Promise.all([getIndicadores(), getProcesos(), supabaseRegistrosAnio(anio), getCierresDelAnio(anio),
-      getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 12 }))])
-      .then(([indicadores, procesos, registros, cierres, cfg]) => vivo && setDatos({ indicadores, procesos, registros, cierres, diaCierre: cfg?.dia_cierre ?? 12 }))
+      getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 15 }))])
+      .then(([indicadores, procesos, registros, cierres, cfg]) => vivo && setDatos({ indicadores, procesos, registros, cierres, diaCierre: cfg?.dia_cierre ?? 15 }))
       .catch(e => vivo && setError(traducirError(e)));
     return () => { vivo = false; };
   }, [anio]);
@@ -86,6 +86,11 @@ export default function Matriz() {
     return true;
   }), [filas, procesoId, estadoFiltro, busqueda]);
 
+  const resumen = useMemo(() => {
+    const cumplen = visibles.reduce((n, f) => n + f.cumplen, 0), incumplen = visibles.reduce((n, f) => n + f.incumplen, 0), sin = visibles.reduce((n, f) => n + f.sinDilig, 0);
+    return { cumplen, incumplen, sin, pct: cumplen + incumplen ? Math.round((cumplen / (cumplen + incumplen)) * 100) : null };
+  }, [visibles]);
+
   // Resumen por mes (solo sobre las filas visibles)
   const pie = useMemo(() => Array.from({ length: 12 }, (_, i) => {
     const c = visibles.filter(f => f.meses[i].estado === 'cumple').length;
@@ -119,12 +124,19 @@ export default function Matriz() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-ancha">
       <PageHeader
         migas={[{ texto: 'Seguimiento' }, { texto: 'Matriz' }]}
         titulo="Matriz de indicadores"
         descripcion="Todos los indicadores en una sola vista, mes a mes. Los indicadores nuevos aparecen aquí apenas se crean."
+        cifras={datos ? [
+          { titulo: `Cumplimiento ${anio}`, valor: resumen.pct, sufijo: '%', principal: true, tono: resumen.pct == null ? '' : resumen.pct >= 85 ? 'bien' : resumen.pct >= 60 ? 'aten' : 'mal', nota: `${visibles.length} indicador${visibles.length === 1 ? '' : 'es'} a la vista` },
+          { titulo: 'Cumplieron la meta', valor: resumen.cumplen, tono: 'bien', nota: 'meses con dato que cumplen' },
+          { titulo: 'No llegaron a la meta', valor: resumen.incumplen, tono: resumen.incumplen ? 'mal' : '', nota: 'meses por debajo de la meta' },
+          { titulo: 'Sin diligenciar', valor: resumen.sin, tono: resumen.sin ? 'aten' : '', nota: 'meses vencidos sin dato' },
+        ] : null}
       >
+        {selectorVista}
         <label className="sr-only" htmlFor="mx-anio">Año</label>
         <select id="mx-anio" value={anio} onChange={e => setAnio(Number(e.target.value))}>
           {[ANIO_ACTUAL, ANIO_ACTUAL - 1, ANIO_ACTUAL - 2].map(a => <option key={a} value={a}>{a}</option>)}
@@ -134,22 +146,6 @@ export default function Matriz() {
 
       {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation"></i><span>{error}</span></div>}
 
-      {datos && (() => {
-        const cumplen = visibles.reduce((n, f) => n + f.cumplen, 0), incumplen = visibles.reduce((n, f) => n + f.incumplen, 0), sin = visibles.reduce((n, f) => n + f.sinDilig, 0);
-        const pct = cumplen + incumplen ? Math.round((cumplen / (cumplen + incumplen)) * 100) : null;
-        return (
-          <Hero
-            etiqueta={`Cumplimiento ${anio}${procesoId || busqueda || estadoFiltro !== 'todos' ? ' · según tus filtros' : ''}`}
-            valor={pct} sufijo="%" tono={pct == null ? undefined : pct >= 85 ? 'bien' : pct >= 60 ? 'aten' : 'mal'}
-            nota={`${visibles.length} indicador${visibles.length === 1 ? '' : 'es'} a la vista`}
-            datos={[
-              { titulo: 'Cumplieron la meta', valor: cumplen, nota: 'meses con dato que cumplen' },
-              { titulo: 'No llegaron a la meta', valor: incumplen, tono: incumplen ? 'alerta' : '', nota: 'meses por debajo de la meta' },
-              { titulo: 'Sin diligenciar', valor: sin, tono: sin ? 'aten' : '', nota: 'meses vencidos sin dato' },
-            ]}
-          />
-        );
-      })()}
 
       <div className="barra-filtros">
         <div className="campo-busqueda">
@@ -172,7 +168,7 @@ export default function Matriz() {
         <div aria-busy="true"><div className="esqueleto" style={{ height: 420 }} /></div>
       ) : datos && (
         <section className="panel panel-matriz">
-          <div className="tabla-scroll matriz-scroll">
+          <div className="tabla-scroll matriz-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte">
             <table className="matriz">
               <thead>
                 <tr>
@@ -233,4 +229,16 @@ export default function Matriz() {
       )}
     </div>
   );
+}
+
+/** La matriz tiene dos caras: la definición de los indicadores (idéntica al Excel) y el seguimiento de resultados mes a mes. */
+export default function Matriz() {
+  const [vista, setVista] = useState('definicion');
+  const selector = (
+    <div className="modo-importar" role="group" aria-label="Qué quieres ver">
+      <button type="button" aria-pressed={vista === 'definicion'} onClick={() => setVista('definicion')}><strong>Definición</strong><small>Igual que el Excel</small></button>
+      <button type="button" aria-pressed={vista === 'seguimiento'} onClick={() => setVista('seguimiento')}><strong>Seguimiento</strong><small>Resultados mes a mes</small></button>
+    </div>
+  );
+  return vista === 'definicion' ? <MatrizExcel selectorVista={selector} /> : <MatrizSeguimiento selectorVista={selector} />;
 }

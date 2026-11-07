@@ -5,11 +5,12 @@ import { traducirError } from '../lib/indicadores';
 import { Confirmar } from '../components/Dialogo';
 import { useSesion } from '../lib/useSesion';
 import { getIndicadores, getProcesos, getCierresDelAnio, getConfiguracionNotificaciones, mesReporteActual, MESES } from '../lib/indicadores';
+import ImportarLibro from './ImportarLibro';
 import { descargarPlantilla, leerLibro, validarRegistros, aplicarRegistros, validarIndicadoresNuevos, aplicarIndicadores } from '../lib/importar';
 
 const { anio: ANIO_ACTUAL, mesActual: MES_ACTUAL } = mesReporteActual();
 
-export default function Importar() {
+function ImportarMes({ selectorModo }) {
   const { sesion } = useSesion();
   const entrada = useRef(null);
   const inicial = MES_ACTUAL === 1 ? { a: ANIO_ACTUAL - 1, m: 12 } : { a: ANIO_ACTUAL, m: MES_ACTUAL - 1 };
@@ -26,8 +27,8 @@ export default function Importar() {
   const [resultado, setResultado] = useState(null);
 
   useEffect(() => {
-    Promise.all([getIndicadores(), getProcesos(), getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 12 }))])
-      .then(([indicadores, procesos, cfg]) => setBase({ indicadores, procesos, diaCierre: cfg?.dia_cierre ?? 12 }))
+    Promise.all([getIndicadores(), getProcesos(), getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 15 }))])
+      .then(([indicadores, procesos, cfg]) => setBase({ indicadores, procesos, diaCierre: cfg?.dia_cierre ?? 15 }))
       .catch(e => setError(traducirError(e)));
   }, []);
 
@@ -78,7 +79,7 @@ export default function Importar() {
         migas={[{ texto: 'Datos' }, { texto: 'Importar Excel' }]}
         titulo="Importar desde Excel"
         descripcion="Carga varios registros de una vez. Lo habitual sigue siendo registrar a mano, indicador por indicador; esto sirve para adelantar trabajo."
-      />
+      >{selectorModo}</PageHeader>
       {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation"></i><span>{error}</span></div>}
 
       <ol className="pasos">
@@ -141,7 +142,7 @@ export default function Importar() {
             <span className="chip-ind chip-ind-ok"><i className="fa-solid fa-check"></i> {validas} {validas === 1 ? 'válida' : 'válidas'}</span>
             {conError > 0 && <span className="chip-ind chip-ind-no"><i className="fa-solid fa-xmark"></i> {conError} con error, no se {conError === 1 ? 'guardará' : 'guardarán'}</span>}
           </div>
-          <div className="tabla-scroll">
+          <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte">
             <table className="tabla-apilable">
               <thead>{pestana === 'registros'
                 ? <tr><th>Fila</th><th>Indicador</th><th>Mes</th><th>Valor</th><th>Resultado de la revisión</th></tr>
@@ -178,4 +179,17 @@ export default function Importar() {
       )}
     </div>
   );
+}
+
+/** Para los administradores hay dos formas de importar: los registros de un mes (plantilla) o el libro original completo. */
+export default function Importar() {
+  const { sesion } = useSesion();
+  const [modo, setModo] = useState('mes');
+  const selector = sesion?.esAdmin ? (
+    <div className="modo-importar" role="group" aria-label="Qué vas a importar">
+      <button type="button" aria-pressed={modo === 'mes'} onClick={() => setModo('mes')}><strong>Registros de un mes</strong><small>Con la plantilla de la aplicación</small></button>
+      <button type="button" aria-pressed={modo === 'libro'} onClick={() => setModo('libro')}><strong>Libro de indicadores</strong><small>El Excel original, completo</small></button>
+    </div>
+  ) : null;
+  return modo === 'libro' && sesion?.esAdmin ? <ImportarLibro selectorModo={selector} /> : <ImportarMes selectorModo={selector} />;
 }

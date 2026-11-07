@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
-import Hero from '../components/Hero';
 import { traducirError } from '../lib/indicadores';
 import { getNovedades, mesReporteActual, MESES } from '../lib/indicadores';
 
@@ -65,6 +64,13 @@ export default function Novedades() {
         migas={[{ texto: 'Administración' }, { texto: 'Novedades' }]}
         titulo="Novedades"
         descripcion="Lo que necesita tu atención: indicadores sin registrar, incumplimientos que se repiten y áreas con menos avance."
+      
+        cifras={datos ? [
+          { titulo: 'Alertas críticas', vivo: datos.totales.criticas > 0, valor: datos.totales.criticas, principal: true, tono: datos.totales.criticas ? 'mal' : 'bien', nota: datos.totales.criticas ? 'requieren acción inmediata' : 'nada urgente por ahora' },
+          { titulo: 'Altas', valor: datos.totales.altas, tono: datos.totales.altas ? 'aten' : '', nota: 'revisar esta semana' },
+          { titulo: 'Meses sin registrar', valor: datos.totales.faltantes, tono: datos.totales.faltantes ? 'aten' : '', nota: 'sumando todos los indicadores' },
+          { titulo: 'Incumple sin plan', valor: datos.totales.sinPlan, tono: datos.totales.sinPlan ? 'mal' : '', nota: 'falta definir acción correctiva' },
+        ] : null}
       >
         <label className="sr-only" htmlFor="anio-nov">Año</label>
         <select id="anio-nov" value={anio} onChange={e => setAnio(Number(e.target.value))}>
@@ -81,16 +87,6 @@ export default function Novedades() {
         </div>
       ) : datos && (
         <>
-          <Hero
-            etiqueta="Alertas críticas" vivo={datos.totales.criticas > 0}
-            valor={datos.totales.criticas} tono={datos.totales.criticas ? 'mal' : 'bien'}
-            nota={datos.totales.criticas ? 'requieren acción inmediata' : 'nada urgente por ahora'}
-            datos={[
-              { titulo: 'Altas', valor: datos.totales.altas, tono: datos.totales.altas ? 'aten' : '', nota: 'revisar esta semana' },
-              { titulo: 'Meses sin registrar', valor: datos.totales.faltantes, tono: datos.totales.faltantes ? 'aten' : '', nota: 'sumando todos los indicadores' },
-              { titulo: 'Incumple sin plan', valor: datos.totales.sinPlan, tono: datos.totales.sinPlan ? 'alerta' : '', nota: 'falta definir acción correctiva' },
-            ]}
-          />
 
           {(peor || mejor) && (
             <div className="cards">
