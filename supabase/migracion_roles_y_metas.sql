@@ -47,8 +47,8 @@ begin
   else
     select coalesce(dia_cierre, 15) into dia from indicadores_configuracion where id = 1;
     dia := least(greatest(coalesce(dia, 15), 1), 28);
-    -- dia = último día para registrar (inclusive): el mes se cierra al día siguiente
-    cerrado := hoy > (make_date(new.anio, new.mes, 1) + interval '1 month' + ((dia - 1) * interval '1 day'))::date;
+    -- dia = último día para registrar DE ESE MISMO MES (inclusive): se cierra al día siguiente; los meses pasados están cerrados
+    cerrado := hoy > make_date(new.anio, new.mes, dia);
   end if;
 
   if cerrado then
@@ -321,8 +321,8 @@ begin
   if found then return coalesce(fila.cerrado, false); end if;
   select coalesce(dia_cierre, 15) into dia from indicadores_configuracion where id = 1;
   dia := least(greatest(coalesce(dia, 15), 1), 28);
-  -- dia = último día para registrar (inclusive): el mes se cierra al día siguiente
-  return hoy > (make_date(p_anio, p_mes, 1) + interval '1 month' + ((dia - 1) * interval '1 day'))::date;
+  -- dia = último día para registrar DE ESE MISMO MES (inclusive): se cierra al día siguiente; los meses pasados están cerrados
+  return hoy > make_date(p_anio, p_mes, dia);
 end $$;
 
 create or replace function public.indicadores_bloquear_mes_cerrado()
@@ -341,3 +341,19 @@ end $$;
 drop trigger if exists trg_indicadores_bloquear_mes_cerrado on indicadores_registros;
 create trigger trg_indicadores_bloquear_mes_cerrado before insert or update or delete on indicadores_registros
   for each row execute function public.indicadores_bloquear_mes_cerrado();
+
+-- 15) Meta máxima: el Excel tiene una fila "Máximos" junto a "Mínimos" (la banda de la meta, p. ej. 95 % a 110 %).
+alter table indicadores add column if not exists meta_maxima numeric;
+
+-- 16) Cada mes se cierra solo DESPUÉS DEL DÍA 15 DE ESE MISMO MES; los meses que ya pasaron quedan cerrados.
+--     (Antes el mes anterior seguía abierto hasta el 15 del mes siguiente.) Un administrador puede reabrir cualquier mes.
+create or replace function public.indicadores_mes_esta_cerrado(p_anio int, p_mes int)
+returns boolean language plpgsql stable security definer set search_path = public as $$
+declare fila record; dia int; hoy date := (now() at time zone 'America/Bogota')::date;
+begin
+  select * into fila from indicadores_cierres where anio = p_anio and mes = p_mes;
+  if found then return coalesce(fila.cerrado, false); end if;     -- lo que decidió un administrador manda
+  select coalesce(dia_cierre, 15) into dia from indicadores_configuracion where id = 1;
+  dia := least(greatest(coalesce(dia, 15), 1), 28);
+  return hoy > make_date(p_anio, p_mes, dia);
+end $$;

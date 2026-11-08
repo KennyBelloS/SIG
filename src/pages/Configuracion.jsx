@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
 import PageHeader from '../components/PageHeader';
@@ -10,8 +11,9 @@ import {
   getProcesos, getIndicadores, actualizarIndicador, actualizarProceso, crearIndicador, desactivarIndicador, ROLES, formatearMetaMensual,
   getCierresDelAnio, reabrirMes, cerrarMes, enviarRecordatorioAhora, estaCerrado, mesVencido, verificarLogoCorreo,
   getConfiguracionNotificaciones, guardarConfiguracionNotificaciones, getHistorialNotificaciones, describirEnvio,
-  mesReporteActual, MESES, formatearMeta, esPorcentaje, entradaAValor, valorAEntrada,
+  mesReporteActual, MESES, MESES_CORTO, formatearMeta, esPorcentaje, entradaAValor, valorAEntrada,
 } from '../lib/indicadores';
+import FormularioIndicador from '../components/EditorIndicador';
 
 const { anio: ANIO_ACTUAL } = mesReporteActual();
 
@@ -29,135 +31,17 @@ const PESTANAS = [
   { id: 'usuarios', label: 'Usuarios', icono: 'fa-users-gear' },
 ];
 
-const CAMPOS_INDICADOR = [
-  { campo: 'nombre', etiqueta: 'Nombre del indicador', tipo: 'text' },
-  { campo: 'directriz', etiqueta: 'Directriz de la política', tipo: 'textarea' },
-  { campo: 'estrategia_asg', etiqueta: 'Estrategia ASG', tipo: 'textarea' },
-  { campo: 'objetivo', etiqueta: 'Objetivo', tipo: 'textarea' },
-  { campo: 'formula_calculo', etiqueta: 'Fórmula de cálculo', tipo: 'textarea' },
-  { campo: 'unidad_medida', etiqueta: 'Unidad de medida', tipo: 'text' },
-  { campo: 'tipo_indicador', etiqueta: 'Tipo de indicador', tipo: 'select', opciones: ['Cumplimiento', 'Eficacia', 'Eficiencia'] },
-  { campo: 'meta_anual', etiqueta: 'Meta anual', tipo: 'number' },
-  { campo: 'meta_mensual', etiqueta: 'Meta mensual', tipo: 'number' },
-  { campo: 'tipo_meta', etiqueta: 'Meta que rige el indicador', tipo: 'select', vacio: 'Automática (según tenga metas por mes)', opciones: [['anual', 'La meta anual'], ['mensual', 'La meta mensual']] },
-  { campo: 'sentido_meta', etiqueta: 'Sentido de la meta', tipo: 'select', opciones: [['mayor_mejor', 'Mayor es mejor'], ['menor_mejor', 'Menor es mejor']] },
-  { campo: 'frecuencia', etiqueta: 'Frecuencia de medición', tipo: 'select', opciones: [['mensual', 'Mensual'], ['trimestral', 'Trimestral'], ['semestral', 'Semestral'], ['anual', 'Anual']] },
-  { campo: 'frecuencia_seguimiento', etiqueta: 'Frecuencia de seguimiento', tipo: 'select', vacio: 'Sin definir', opciones: [['mensual', 'Mensual'], ['bimestral', 'Bimestral'], ['trimestral', 'Trimestral'], ['semestral', 'Semestral'], ['anual', 'Anual']] },
-  { campo: 'responsable_medicion', etiqueta: 'Responsable de la medición', tipo: 'text' },
-  { campo: 'procesos_relacionados', etiqueta: 'Procesos relacionados', tipo: 'text' },
-  { campo: 'fuente_informacion', etiqueta: 'Fuente de información', tipo: 'text' },
-  { campo: 'categoria', etiqueta: 'Categoría (color)', tipo: 'text' },
-  { campo: 'color_categoria', etiqueta: 'Color (hex)', tipo: 'color' },
-];
-
-const CAMPOS_META = ['meta_anual', 'meta_mensual'];
-
-/** Crear (indicador = null) o editar un indicador. Las metas se escriben como en el resto de la app:
- *  en % cuando la unidad es un porcentaje (95 = 95 %). */
-function FormularioIndicador({ indicador, procesos, procesoInicial, onGuardado, onCancelar }) {
-  const crear = !indicador;
-  const base = indicador || { unidad_medida: '', sentido_meta: 'mayor_mejor', frecuencia: 'mensual' };
-  const [form, setForm] = useState(() => ({
-    ...Object.fromEntries(CAMPOS_INDICADOR.map(c => [c.campo, base[c.campo] ?? ''])),
-    ...Object.fromEntries(CAMPOS_META.map(k => [k, valorAEntrada(base, base[k])])),
-    proceso_id: base.proceso_id || procesoInicial || procesos[0]?.id || '',
-  }));
-  const enPorcentaje = esPorcentaje({ unidad_medida: form.unidad_medida });
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState(null);
-  const [daDeBaja, setDaDeBaja] = useState(false);
-
-  async function guardar(e) {
-    e?.preventDefault?.();
-    setError(null);
-    if (!String(form.nombre || '').trim()) { setError('Escribe el nombre del indicador.'); return; }
-    const meta = k => (form[k] === '' || form[k] == null ? null : entradaAValor({ unidad_medida: form.unidad_medida }, form[k]));
-    if (crear && meta('meta_anual') == null && meta('meta_mensual') == null) { setError('Define al menos una meta: la anual o la mensual.'); return; }
-    setGuardando(true);
-    try {
-      const { proceso_id, ...resto } = form;
-      const cambios = Object.fromEntries(Object.entries(resto).map(([k, v]) => [k, v === '' ? null : v]));
-      cambios.meta_anual = meta('meta_anual'); cambios.meta_mensual = meta('meta_mensual');
-      cambios.sentido_meta = form.sentido_meta || 'mayor_mejor'; cambios.frecuencia = form.frecuencia || 'mensual';
-      if (crear) await crearIndicador({ ...cambios, proceso_id: Number(proceso_id) });
-      else await actualizarIndicador(indicador.id, cambios);
-      avisar(crear ? 'Indicador creado: ya aparece en la matriz.' : 'Cambios guardados.', { tipo: 'ok', celebrar: crear });
-      await onGuardado();
-    } catch (err) { setError(traducirError(err)); } finally { setGuardando(false); }
-  }
-
-  async function darDeBaja() {
-    setGuardando(true);
-    try { await desactivarIndicador(indicador.id); await onGuardado(); }
-    catch (err) { setError(traducirError(err)); setDaDeBaja(false); } finally { setGuardando(false); }
-  }
-
-  return (
-    <Dialogo titulo={crear ? 'Nuevo indicador' : `Editar ${indicador.nombre}`} onCerrar={onCancelar} ancho={720}>
-      <form className="form-dialogo" onSubmit={guardar}>
-        <h2>{crear ? 'Nuevo indicador' : 'Editar indicador'}</h2>
-        {crear && <p className="texto-tenue" style={{ marginTop: -8 }}>Apenas lo guardes aparece en la lista, la matriz, el dashboard y los informes.</p>}
-        <div className="config-grid-form">
-          {crear && (
-            <label style={{ gridColumn: '1 / -1' }}>Proceso
-              <select value={form.proceso_id} onChange={e => setForm(f => ({ ...f, proceso_id: e.target.value }))}>
-                {procesos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-              </select>
-            </label>
-          )}
-          {CAMPOS_INDICADOR.map(c => (
-            <label key={c.campo} style={c.tipo === 'textarea' || c.campo === 'nombre' ? { gridColumn: '1 / -1' } : undefined}>
-              {c.etiqueta}
-              {c.tipo === 'textarea' ? (
-                <textarea rows={2} value={form[c.campo] || ''} onChange={e => setForm(f => ({ ...f, [c.campo]: e.target.value }))} />
-              ) : c.tipo === 'select' ? (
-                <select value={form[c.campo] || ''} onChange={e => setForm(f => ({ ...f, [c.campo]: e.target.value }))}>
-                  <option value="">{c.vacio || '—'}</option>
-                  {c.opciones.map(op => Array.isArray(op)
-                    ? <option key={op[0]} value={op[0]}>{op[1]}</option>
-                    : <option key={op} value={op}>{op}</option>)}
-                </select>
-              ) : c.tipo === 'color' ? (
-                <input type="color" value={form[c.campo] || '#999999'} onChange={e => setForm(f => ({ ...f, [c.campo]: e.target.value }))} />
-              ) : CAMPOS_META.includes(c.campo) ? (
-                <>
-                  <div className="campo-con-sufijo">
-                    <input type="number" step="any" value={form[c.campo] ?? ''} onChange={e => setForm(f => ({ ...f, [c.campo]: e.target.value }))} />
-                    {enPorcentaje && <span className="sufijo">%</span>}
-                  </div>
-                  <small className="ayuda-campo">{enPorcentaje ? 'Escribe el porcentaje tal cual: 95 significa 95 %.' : 'En la unidad del indicador.'}</small>
-                </>
-              ) : (
-                <input type={c.tipo} value={form[c.campo] || ''} onChange={e => setForm(f => ({ ...f, [c.campo]: e.target.value }))} />
-              )}
-            </label>
-          ))}
-        </div>
-        <p className="ayuda-campo" style={{ marginTop: 0 }}>La meta anual y la mensual son independientes. La que rige se elige arriba y es la que usan el cumplimiento, la matriz y las gráficas (en la gráfica también se puede cambiar al vuelo).</p>
-        {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation"></i><span>{error}</span></div>}
-        <div className="ind-modal-acciones" style={{ justifyContent: 'space-between' }}>
-          {!crear ? <button type="button" className="btn-secondary btn-baja" onClick={() => setDaDeBaja(true)}><i className="fa-solid fa-box-archive"></i> Dar de baja</button> : <span />}
-          <span style={{ display: 'flex', gap: 8 }}>
-            <button type="button" className="btn-secondary" onClick={onCancelar}>Cancelar</button>
-            <button type="submit" className="btn-primary" disabled={guardando}>{guardando ? 'Guardando…' : crear ? 'Crear indicador' : 'Guardar cambios'}</button>
-          </span>
-        </div>
-      </form>
-      {daDeBaja && (
-        <Confirmar titulo="¿Dar de baja este indicador?" peligro textoBoton="Dar de baja" cargando={guardando}
-          texto="Dejará de verse en la lista, la matriz, el dashboard y los informes. Su historial no se borra." onConfirmar={darDeBaja} onCancelar={() => setDaDeBaja(false)} />
-      )}
-    </Dialogo>
-  );
-}
 
 function PestanaIndicadores() {
   const [procesos, setProcesos] = useState([]);
   const [indicadoresPorProceso, setIndicadoresPorProceso] = useState(new Map());
   const [editando, setEditando] = useState(null);
   const [nuevoEn, setNuevoEn] = useState(null);
+  const [params, setParams] = useSearchParams();
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+  // desde el botón «+»: «Crear un indicador» llega aquí con ?nuevo=1 y abre directamente el formulario
+  useEffect(() => { if (params.get('nuevo') && procesos.length) { setNuevoEn(procesos[0].id); setParams({}, { replace: true }); } }, [params, procesos.length]); // eslint-disable-line
   const [editandoProceso, setEditandoProceso] = useState(null);
   const [nombreProceso, setNombreProceso] = useState('');
 
@@ -263,8 +147,8 @@ function PestanaCierres() {
         </select>
       </div>
       <p style={{ marginTop: 0 }}>
-        Los meses se cierran <strong>solos</strong> cuando vencen: el mes anterior se puede registrar hasta el día {diaCierre} (inclusive) y desde el día {diaCierre + 1} queda bloqueado,
-        y todos los meses más viejos quedan cerrados siempre. Solo un administrador puede reabrirlos desde aquí.
+        Los meses se cierran <strong>solos</strong> cada mes se puede registrar hasta el día {diaCierre} de ese mismo mes (inclusive) y desde el día {diaCierre + 1} queda bloqueado,
+        y los meses que ya pasaron están cerrados siempre. Solo un administrador puede reabrirlos desde aquí.
       </p>
       {error && <div className="alert danger">{error}</div>}
       {mensaje && <div className="alert-inline"><i className="fa-solid fa-circle-info"></i>{mensaje}</div>}
@@ -340,7 +224,7 @@ function EnvioAutomatico({ cfg }) {
     apagado: ['aviso-info', 'fa-circle-pause', 'Los envíos automáticos están desactivados. Activa la casilla "Envíos activos" y guarda.'],
   }[estado];
   const filas = [
-    ['fa-envelope', 'Recordatorio del mes anterior', cfg.dia_envio, 'A todos los procesos, con el resumen de cómo cerró el mes'],
+    ['fa-envelope', 'Recordatorio del mes en curso', cfg.dia_envio, 'A todos los procesos, con el resumen de cómo va el mes'],
     ['fa-hourglass-half', 'Faltan 2 días para el último día', aviso, 'Solo a los procesos que todavía tienen pendientes'],
     ['fa-lock', 'Cierre del mes', cierre, `El mes queda bloqueado (se pudo registrar hasta el ${ultimo}) y se avisa a todos los procesos`],
   ];
@@ -398,11 +282,11 @@ function PestanaNotificaciones() {
   const [porEnviar, setPorEnviar] = useState(null);
   const TEXTOS_ENVIO = {
     recordatorio: { titulo: '¿Enviar el recordatorio ahora?', boton: 'Enviar recordatorio', peligro: false,
-      texto: 'Se enviará un correo real a los involucrados de cada proceso que tenga indicadores pendientes del mes anterior. Solo lo reciben quienes tienen los avisos activados.' },
+      texto: 'Se enviará un correo real a los involucrados de cada proceso que tenga indicadores pendientes del mes en curso. Solo lo reciben quienes tienen los avisos activados.' },
     dos_dias: { titulo: '¿Enviar el aviso de 2 días ahora?', boton: 'Enviar aviso', peligro: false,
       texto: 'Se enviará un correo real a los involucrados de cada proceso que aún tenga indicadores sin registrar, avisando que el mes está por cerrar.' },
-    cierre: { titulo: '¿Cerrar el mes anterior y avisar?', boton: 'Cerrar y avisar', peligro: true,
-      texto: 'El mes anterior quedará bloqueado para todos hasta que lo reabras en Cierres mensuales, y se enviará un correo a los involucrados de cada proceso.' },
+    cierre: { titulo: '¿Cerrar el mes en curso y avisar?', boton: 'Cerrar y avisar', peligro: true,
+      texto: 'El mes en curso quedará bloqueado para todos hasta que lo reabras en Cierres mensuales, y se enviará un correo a los involucrados de cada proceso.' },
   };
 
   async function probar(accion) {
@@ -460,7 +344,7 @@ function PestanaNotificaciones() {
       <section className="panel">
         <div className="panel-header"><h2>Calendario de correos automáticos</h2></div>
         <p style={{ marginTop: 0 }}>
-          Se envían solos, en hora de Colombia: el <strong>día {form.dia_envio}</strong> se recuerda diligenciar el mes anterior a
+          Se envían solos, en hora de Colombia: el <strong>día {form.dia_envio}</strong> se recuerda diligenciar el mes en curso a
           <strong> todos los procesos</strong>; <strong>dos días antes del último día</strong> se avisa a quienes aún tienen pendientes; y el
           <strong> día {form.dia_cierre + 1}</strong> el mes se cierra y se notifica a <strong>todos</strong>. Se puede registrar hasta el día {form.dia_cierre}, inclusive.
         </p>
@@ -671,7 +555,7 @@ function PestanaUsuarios() {
     catch { setCopiado(false); }
   }
 
-  const textoAcceso = c => `Aplicación de Indicadores de Gestión\nCorreo: ${c.email}\nContraseña temporal: ${c.password}\nAl entrar, cámbiala desde tu nombre, arriba a la derecha.`;
+  const textoAcceso = c => `Sistema de Gestión de Finca Torremolinos\nCorreo: ${c.email}\nContraseña temporal: ${c.password}\nAl entrar, cámbiala desde tu nombre, arriba a la derecha.`;
 
   return (
     <>

@@ -1,4 +1,4 @@
-# Diseño de Indicadores de Gestión: el plano de campo
+# Diseño del Sistema de Gestión: el plano de campo
 
 Documento de entrega para quien mantenga la interfaz. Cubre el concepto, los *tokens*, el movimiento, los componentes y sus estados, la accesibilidad verificada y las reglas de redacción. Todo vive en `src/plano.css` (tokens y componentes) y `src/components/`.
 
@@ -57,13 +57,13 @@ Todo se apaga con *reducir movimiento* (`prefers-reduced-motion`): animaciones y
 - **Paleta de búsqueda** (`Paleta`): patrón *combobox* + *listbox*; el foco se queda en el campo y la opción activa se anuncia (`aria-activedescendant`). Abre con Ctrl/⌘ K o «/».
 - **Mes cerrado**: título con candado, aviso con el porqué y quién puede reabrirlo, campos de solo lectura. El administrador ve «Reabrir este mes».
 - **Registro por componentes**: dos números con los nombres del indicador y un resultado que se calcula a la vista, con *aria-live* y si cumple la meta.
-- **Auditoría**: lista de eventos con «Ver los cambios» (antes y después), accesos en línea, y espacio con barra y estimación.
+- **Bitácora**: lista de eventos con «Ver los cambios» (antes y después), accesos en línea, y espacio con barra y estimación.
 
 Vacío, carga y error siempre existen: esqueleto con brillo mientras carga (`Cargando`), estado vacío que explica cómo empezar, y alerta con la causa.
 
 ## 5. Accesibilidad verificada
 
-- Auditoría automática con **axe-core (WCAG 2.0/2.1 A y AA)**: 0 violaciones en las pantallas principales de escritorio, en celular, en los cuadros de diálogo, con el menú abierto y con el rol de solo consulta.
+- Bitácora automática con **axe-core (WCAG 2.0/2.1 A y AA)**: 0 violaciones en las pantallas principales de escritorio, en celular, en los cuadros de diálogo, con el menú abierto y con el rol de solo consulta.
 - Contraste: textos secundarios y rol dorado sobre verde corregidos; el dorado en texto usa `--gold-ink`.
 - Teclado: enlace «Saltar al contenido», tablas con desplazamiento enfocables, buscador completo con teclado, cuadros de diálogo con foco atrapado y devuelto.
 - Zoom: la bienvenida y el cajetín se prueban del 100 % al 400 %; la bienvenida siempre cabe y sus botones quedan a la vista.

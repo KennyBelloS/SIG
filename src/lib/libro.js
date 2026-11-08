@@ -91,16 +91,18 @@ function leerHojaIndicador(nombreHoja, datos) {
   if (!mesesOk) return { hoja: nombreHoja, nombre, error: 'Los meses no están en columnas seguidas.' };
 
   // filas bajo la cabecera de meses, identificadas por su etiqueta (columna anterior a "Enero")
-  const etiquetas = new Map();
+  const etiquetas = new Map(), textos = new Map();
   for (let r = rCab + 1; r <= rCab + 9; r++) {
     const t = normalizar(celda(datos, r, cEne - 1));
-    if (t && !etiquetas.has(t)) etiquetas.set(t, r);
+    if (t && !etiquetas.has(t)) { etiquetas.set(t, r); textos.set(t, limpio(celda(datos, r, cEne - 1))); }
   }
   const filaDe = (...claves) => { for (const [t, r] of etiquetas) if (claves.some(k => (k.endsWith('$') ? t === k.slice(0, -1) : t.startsWith(k)))) return r; return null; };
   const rVal = filaDe('indicador$', 'resultado', 'real$');
   const rMeta = filaDe('minimo', 'meta$');
   const valores = cols.map(c => (rVal ? numero(celda(datos, rVal, c)) : null));
   const metas = cols.map(c => (rMeta ? numero(celda(datos, rMeta, c)) : null));
+  const rMax = filaDe('maximo');
+  const maximas = cols.map(c => (rMax ? numero(celda(datos, rMax, c)) : null));
 
   // tabla de análisis: columna "MES", y a la derecha el análisis y el "PLAN DE ACCIÓN"
   const analisis = Array(12).fill(''), plan = Array(12).fill('');
@@ -123,10 +125,11 @@ function leerHojaIndicador(nombreHoja, datos) {
   if (rPlan && rEjec) par = { tipo: 'ejecucion', a: rPlan, b: rEjec };
   else if (rNum && rDen) par = { tipo: 'razon', a: rNum, b: rDen };
   else if ((r25 || rNum) && r26) par = { tipo: 'anio', a: r25 || rNum, b: r26 };
+  else { const rNP = filaDe('n personal', 'n° personal', 'numero de personal', 'n. personal'), rCal = filaDe('calificacion'); if (rNP && rCal) par = { tipo: 'apoyo', a: rNP, b: rCal }; }
   const A = par ? cols.map(c => numero(celda(datos, par.a, c))) : null, B = par ? cols.map(c => numero(celda(datos, par.b, c))) : null;
   let errores = 0;
   for (const r of [rVal, par?.a, par?.b]) if (r) for (const c of cols) { const v = celda(datos, r, c); if (typeof v === 'string' && v.startsWith('#')) errores++; }
-  return { hoja: nombreHoja, nombre, formula_calculo: limpio(bajoEtiqueta(datos, t => t.startsWith('formula de calculo'))), valores, metas, analisis, plan, par, A, B, errores, formulaInferida: par ? inferirFormula(A, B, valores, metas) : null };
+  return { hoja: nombreHoja, nombre, formula_calculo: limpio(bajoEtiqueta(datos, t => t.startsWith('formula de calculo'))), valores, metas, maximas, analisis, plan, par, A, B, errores, textoA: par ? textos.get([...etiquetas].find(([, r]) => r === par.a)?.[0]) : null, textoB: par ? textos.get([...etiquetas].find(([, r]) => r === par.b)?.[0]) : null, formulaInferida: par ? inferirFormula(A, B, valores, metas) : null };
 }
 
 /** Meta mensual del libro (fila "Mínimos"): solo cuenta si difiere de la meta anual. Los ceros no son una meta. */
@@ -254,8 +257,17 @@ export function parsearLibro(hojas) {
     Object.assign(ind, metaMensualDe(h.metas, f.meta_anual));
     const { registros, cerosIgnorados } = registrosDe(h);
     ind.registros = registros; ind.cerosIgnorados = cerosIgnorados;
+    const maxs = [...new Set(h.maximas.filter(m => m != null && m !== 0).map(m => Number(m.toPrecision(12))))];
+    if (maxs.length === 1) ind.meta_maxima = maxs[0];
+    else if (maxs.length > 1) ind.avisos.push('El libro trae una meta máxima distinta en cada mes; la aplicación guarda una sola, así que no se importa.');
     const dec = decidirCalculo(h, ind);
     ind.calculo = dec.calculo;
+    // un indicador que se digita también puede traer filas de apoyo (numerador y denominador, n.º de personal y calificación): se conservan como datos de apoyo
+    if (dec.calculo === 'directo' && h.par && (h.A.some(x => x != null) || h.B.some(x => x != null))) {
+      const nombresPar = { razon: ['Numerador', 'Denominador'], anio: ['Año anterior', 'Año actual'], ejecucion: ['Planeadas', 'Ejecutadas'] }[h.par.tipo] || [h.textoA || 'Dato 1', h.textoB || 'Dato 2'];
+      ind.componentes = { a: nombresPar[0], b: nombresPar[1] };
+      for (const r of ind.registros) { const a = h.A[r.mes - 1], b = h.B[r.mes - 1]; if (a != null || b != null) r.componentes = { a, b }; }
+    }
     if (dec.calculo !== 'directo') {
       const lab = CALCULOS[dec.calculo].etiquetas;
       ind.componentes = { a: lab.a, b: lab.b };
@@ -322,7 +334,7 @@ export function planificarImportacion(libro, app, { anio, modo = 'completar', pr
   const porNombre = new Map(app.indicadores.map(i => [normalizar(i.nombre), i]));
   const regApp = new Map(app.registros.filter(r => r.anio === anio).map(r => [`${r.indicador_id}|${r.mes}`, r]));
   const filas = [];
-  const total = { indicadoresNuevos: 0, indicadoresCoinciden: 0, cambiosCatalogo: 0, regNuevos: 0, regIguales: 0, regDistintos: 0, regCompletar: 0, regOmitidos: 0, sinPlanHistorico: 0, cerosIgnorados: 0, conMetaMensualNueva: 0, regRecalcular: 0, conFormulaCorregida: 0, mesesQueCambianPorFormula: 0, conComponentes: 0 };
+  const total = { indicadoresNuevos: 0, indicadoresCoinciden: 0, cambiosCatalogo: 0, regNuevos: 0, regIguales: 0, regDistintos: 0, regCompletar: 0, regOmitidos: 0, sinPlanHistorico: 0, cerosIgnorados: 0, conMetaMensualNueva: 0, regRecalcular: 0, conFormulaCorregida: 0, mesesQueCambianPorFormula: 0, conComponentes: 0, conApoyo: 0, conMaxima: 0 };
 
   for (const ind of libro.indicadores) {
     const ex = porNombre.get(normalizar(ind.nombre));
@@ -344,6 +356,8 @@ export function planificarImportacion(libro, app, { anio, modo = 'completar', pr
       }
       if (corregir && ind.correccion && ind.sentido_meta && ex.sentido_meta !== ind.sentido_meta) { propuesto.sentido_meta = ind.sentido_meta; fila.cambios.push({ campo: 'sentido_meta', antes: ex.sentido_meta, despues: ind.sentido_meta }); }
       if (ind.correccion) { total.conFormulaCorregida++; total.mesesQueCambianPorFormula += ind.correccion.cambian; }
+      if (ind.calculo === 'directo' && ind.componentes && !ex.componentes) { propuesto.componentes = ind.componentes; fila.cambios.push({ campo: 'componentes', antes: null, despues: 'datos de apoyo' }); total.conApoyo++; }
+      if (ind.meta_maxima != null && !igualNum(ind.meta_maxima, ex.meta_maxima) && (ex.meta_maxima == null || modo === 'reemplazar')) { propuesto.meta_maxima = ind.meta_maxima; fila.cambios.push({ campo: 'meta_maxima', antes: ex.meta_maxima ?? null, despues: ind.meta_maxima }); total.conMaxima++; }
       // meta mensual: es lo que hace que el indicador se evalúe como lo evalúa el libro; se carga si la app no la tiene
       if (ind.meta_mensual != null && !igualNum(ind.meta_mensual, ex.meta_mensual) && (ex.meta_mensual == null || modo === 'reemplazar')) {
         propuesto.meta_mensual = ind.meta_mensual; propuesto.tipo_meta = 'mensual';
@@ -407,7 +421,7 @@ export function cargaParaServidor(plan, libro, procesoDe = {}) {
     if (f.estado === 'nuevo') {
       catalogo.push({
         nuevo: true, ref: f.nombre, proceso_id: procesoDe[f.orden] ?? f.procesoSugerido,
-        campos: Object.fromEntries(['nombre', ...CAMPOS_TEXTO].map(k => [k, ind[k] || null]).concat([['meta_anual', ind.meta_anual], ['meta_mensual', ind.meta_mensual ?? null], ['tipo_meta', ind.tipo_meta ?? null], ['metas_mensuales', ind.metas_mensuales ?? null], ['referencia_anterior', ind.referencia_anterior ?? null], ['sentido_meta', ind.sentido_meta && plan.corregir ? ind.sentido_meta : 'mayor_mejor'], ['calculo', ind.calculo || 'directo'], ['componentes', ind.calculo && ind.calculo !== 'directo' ? ind.componentes : null]])),
+        campos: Object.fromEntries(['nombre', ...CAMPOS_TEXTO].map(k => [k, ind[k] || null]).concat([['meta_anual', ind.meta_anual], ['meta_mensual', ind.meta_mensual ?? null], ['tipo_meta', ind.tipo_meta ?? null], ['metas_mensuales', ind.metas_mensuales ?? null], ['referencia_anterior', ind.referencia_anterior ?? null], ['sentido_meta', ind.sentido_meta && plan.corregir ? ind.sentido_meta : 'mayor_mejor'], ['calculo', ind.calculo || 'directo'], ['componentes', ind.componentes ?? null], ['meta_maxima', ind.meta_maxima ?? null]])),
       });
     } else if (Object.keys(f.propuesto).length) catalogo.push({ nuevo: false, ref: f.nombre, nombre: f.nombre, campos: f.propuesto });
     for (const r of porAplicar) registros.push({ ref: f.nombre, anio: plan.anio, mes: r.mes, valor: r.valor ?? null, analisis: r.analisis ?? null, accion: r.accion ?? null, componentes: r.componentes ?? null, modo: r.estado });

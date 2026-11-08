@@ -20,9 +20,9 @@ const CAMPO = {
   meta_anual: 'Meta anual', meta_mensual: 'Meta mensual', metas_mensuales: 'Metas por mes', tipo_meta: 'Meta que rige', sentido_meta: 'Sentido de la meta', calculo: 'Forma de cálculo', objetivo: 'Objetivo', nombre: 'Nombre', unidad_medida: 'Unidad',
   rol: 'Rol', email: 'Correo', cerrado: 'Cerrado', activo: 'Activo', dia_envio: 'Día del recordatorio', dia_cierre: 'Último día para registrar', almacenamiento_limite_mb: 'Límite de almacenamiento (MB)', notificar: 'Recibe avisos', cargo: 'Cargo', historico: 'Histórico',
 };
-const PANTALLAS = { '/dashboard': 'Dashboard', '/matriz': 'Matriz', '/indicadores': 'Indicadores', '/informe': 'Informe mensual', '/importar': 'Importar Excel', '/novedades': 'Novedades', '/configuracion': 'Configuración', '/auditoria': 'Auditoría', '/ayuda': 'Cómo se usa' };
+const PANTALLAS = { '/dashboard': 'Dashboard', '/matriz': 'Matriz', '/indicadores': 'Indicadores', '/informe': 'Informe mensual', '/importar': 'Importar Excel', '/novedades': 'Novedades', '/configuracion': 'Configuración', '/bitacora': 'Bitácora', '/ayuda': 'Cómo se usa' };
 const pantalla = p => (p?.startsWith('/indicadores/') ? 'Ficha de un indicador' : PANTALLAS[p] || p || '—');
-const NOMBRE_TABLA = { indicadores_registros: 'Registros mensuales', indicadores_auditoria: 'Auditoría', indicadores: 'Catálogo de indicadores', indicadores_notificaciones: 'Correos enviados', indicadores_involucrados: 'Involucrados', indicadores_usuarios: 'Usuarios', indicadores_cierres: 'Cierres de mes', indicadores_configuracion: 'Configuración', indicadores_presencia: 'En línea', indicadores_procesos: 'Procesos' };
+const NOMBRE_TABLA = { indicadores_registros: 'Registros mensuales', indicadores_auditoria: 'Bitácora', indicadores: 'Catálogo de indicadores', indicadores_notificaciones: 'Correos enviados', indicadores_involucrados: 'Involucrados', indicadores_usuarios: 'Usuarios', indicadores_cierres: 'Cierres de mes', indicadores_configuracion: 'Configuración', indicadores_presencia: 'En línea', indicadores_procesos: 'Procesos' };
 const COLORES = ['var(--f-800)', 'var(--gold)', '#2E6DA4', 'var(--wine)', '#6B4C9A', '#5F7A6B', '#C9C5B3'];
 const PERIODOS = [['hoy', 'Hoy'], ['7', 'Últimos 7 días'], ['30', 'Últimos 30 días'], ['todo', 'Todo el historial']];
 
@@ -95,7 +95,7 @@ function Actividad({ periodo, setPeriodo }) {
     const cab = ['Fecha', 'Persona', 'Correo', 'Clase', 'Acción', 'Detalle'].map(v => ({ value: v, fontWeight: 'bold' }));
     const filas = vistos.map(e => [e.creado_en ? exacta(e.creado_en) : '', e.nombre || '', e.email || '', (TIPOS[e.tipo] || {}).texto || e.tipo, e.accion, e.resumen].map(v => ({ value: v == null ? '' : String(v), type: String })));
     await escribir([cab, ...filas], { columns: [{ width: 22 }, { width: 24 }, { width: 30 }, { width: 16 }, { width: 12 }, { width: 70 }] })
-      .toFile(`auditoria-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      .toFile(`bitacora-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   return (
@@ -228,7 +228,7 @@ function Espacio({ onDatos }) {
       <section className="panel" aria-labelledby="esp-consejos">
         <div className="panel-header"><h2 id="esp-consejos">Consejos para no quedarse sin espacio</h2></div>
         <ul className="esp-consejos">
-          <li><i className="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><div><strong>La auditoría crece con el uso</strong><p>Hoy guarda {aud ? aud.filas.toLocaleString('es-CO') : 0} eventos y ocupa {mb(aud?.bytes || 0)} MB. Cada cambio y cada entrada suman unos pocos cientos de bytes; con varias personas trabajando todo el año sigue siendo poco frente a 500 MB.</p></div></li>
+          <li><i className="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><div><strong>La bitácora crece con el uso</strong><p>Hoy guarda {aud ? aud.filas.toLocaleString('es-CO') : 0} eventos y ocupa {mb(aud?.bytes || 0)} MB. Cada cambio y cada entrada suman unos pocos cientos de bytes; con varias personas trabajando todo el año sigue siendo poco frente a 500 MB.</p></div></li>
           <li><i className="fa-solid fa-file-arrow-down" aria-hidden="true"></i><div><strong>Descarga una copia cada mes</strong><p>Al cerrar el mes, baja el informe en PDF y la Matriz en Excel. Son una foto legible del cierre y no ocupan espacio de la base.</p></div></li>
           <li><i className="fa-solid fa-sliders" aria-hidden="true"></i><div><strong>Mantén el límite al día</strong><p>La estimación usa el límite que escribiste arriba: debe coincidir con el de tu plan de Supabase.</p></div></li>
         </ul>
@@ -249,7 +249,7 @@ export default function Auditoria() {
     : pestana === 'actividad' && resumen?.hoy != null ? [{ titulo: 'Cambios hoy', valor: resumen.hoy, principal: true, nota: 'registros, catálogo, cierres y usuarios' }] : null;
   return (
     <div className="page">
-      <PageHeader titulo="Auditoría" descripcion="Quién cambió qué, quién entró y quién salió, y cuánto espacio queda en la base de datos." cifras={cifras}>
+      <PageHeader titulo="Bitácora" descripcion="Quién cambió qué, quién entró y quién salió, y cuánto espacio queda en la base de datos." cifras={cifras}>
         <div className="modo-importar" role="tablist" aria-label="Qué quieres revisar" aria-orientation="vertical" onKeyDown={e => {
           const ids = ['actividad', 'accesos', 'espacio'], i = ids.indexOf(pestana);
           const ir = { ArrowDown: (i + 1) % 3, ArrowRight: (i + 1) % 3, ArrowUp: (i + 2) % 3, ArrowLeft: (i + 2) % 3, Home: 0, End: 2 }[e.key];

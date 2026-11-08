@@ -164,7 +164,7 @@ export function IlusCierre() {
   const marca = [[2, 'fa-envelope', 'Recordatorio', 'a todos'], [13, 'fa-hourglass-half', 'Faltan 2 días', 'a quien tiene pendientes'], [16, 'fa-lock', 'Cierre', 'el mes se bloquea']];
   return (
     <div className="ilus-cierre">
-      <p className="a-aparece" style={d(0.1)}>Septiembre se gestiona en octubre</p>
+      <p className="a-aparece" style={d(0.1)}>Cada mes se registra dentro del mismo mes</p>
       <div className="linea-dias">
         <u className="avance a-llena-x" style={{ ...d(0.4), width: '100%', animationDuration: '4.2s' }} />
         {marca.map(([dia, ic, t, s], i) => (

@@ -43,9 +43,8 @@ export default function FranjaPlazo() {
 
   const estadoDe = m => {
     if (m > mesHoy) return 'futuro';
-    if (m === mesHoy) return 'curso';
-    if (anioHoy === anioReporte && m === mesReporte && !cerrado) return 'plazo';
-    return estaCerrado(anioHoy, m, datos.cierres, datos.dia) ? 'cerrado' : 'abierto';
+    // los meses pasados están cerrados (salvo que un administrador los reabra); el mes en curso es el del plazo
+    return estaCerrado(anioHoy, m, datos.cierres, datos.dia) ? 'cerrado' : (m === mesHoy ? 'plazo' : 'abierto');
   };
   const TEXTO = { futuro: 'por venir', curso: 'mes en curso', plazo: 'abierto para registrar', abierto: 'abierto', cerrado: 'cerrado' };
 

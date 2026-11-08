@@ -43,3 +43,6 @@ export function motivoSinCalculo(ind, comp) {
   if (ind.calculo === 'reduccion' && !(a > 0)) return `${e.a} debe ser mayor que cero: sin una base no hay con qué comparar. Si es cero, escribe el resultado directo.`;
   return null;
 }
+
+/** Un indicador que se digita pero trae datos de apoyo (p. ej. numerador y denominador que no cambian el resultado). */
+export const tieneApoyo = ind => !!ind && (!ind.calculo || ind.calculo === 'directo') && !!(ind.componentes && (ind.componentes.a || ind.componentes.b));

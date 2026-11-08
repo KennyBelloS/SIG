@@ -90,8 +90,8 @@ export const LAMINAS = [
   { id: 'cierre', icono: 'fa-lock', titulo: 'Cierre automático de meses', ruta: '/configuracion', boton: 'Ir a Configuración',
     resumen: 'Cada mes se cierra solo en una fecha fija. Después de eso, solo un administrador puede reabrirlo.',
     pasos: [
-      'El mes en curso siempre está abierto.', 'La franja de colores que ves arriba, en todas las pantallas, dice hasta qué día se puede registrar y cuántos días quedan.',
-      'El mes anterior sigue abierto hasta el día 15 (inclusive) y el 16 se cierra solo.',
+      'El mes en curso está abierto hasta el día 15.', 'La franja de colores que ves arriba, en todas las pantallas, dice hasta qué día se puede registrar y cuántos días quedan.',
+      'Cada mes se puede registrar hasta el día 15 de ese mismo mes (inclusive) y el 16 se cierra solo. Los meses que ya pasaron están cerrados.',
       'Un mes cerrado no se puede modificar ni a mano ni con Excel. El candado aparece en la cinta.',
       'Un administrador puede reabrir un mes concreto desde Configuración → Cierres mensuales.',
       'El bloqueo lo aplica la base de datos, así que no se puede saltar con una pestaña vieja ni con otra herramienta.',
@@ -99,7 +99,7 @@ export const LAMINAS = [
   { id: 'correos', icono: 'fa-envelope', titulo: 'Correos automáticos', ruta: '/configuracion', boton: 'Ir a Configuración',
     resumen: 'La aplicación recuerda sola. Los correos salen firmados con el cargo y no llevan enlaces.',
     pasos: [
-      'Día 2 de cada mes: recordatorio a todos los procesos para que registren el mes anterior.',
+      'Día 2 de cada mes: recordatorio a todos los procesos para que registren el mes en curso.',
       'Día 13 (dos días antes del último día): aviso solo a quienes todavía tienen pendientes.',
       'Día 16: el mes se cierra y se avisa a todos cómo quedó.',
       'Reciben el correo las personas de "Involucrados" de cada proceso que tengan los avisos activados.',
@@ -152,7 +152,7 @@ export const NODOS = [
     recibe: [], alimenta: ['registro', 'excel', 'informe'],
     detalle: 'La exigen la pantalla, la importación y la propia base de datos. Por eso el informe mensual siempre tiene qué mostrar en la columna de plan.' },
   { id: 'cierre', col: 'nucleo', icono: 'fa-lock', titulo: 'Cierre automático', ruta: '/configuracion', roles: ['admin'],
-    sirve: 'Regla: un mes sigue abierto hasta el día 15 del mes siguiente (es configurable) y el 16 se cierra solo. Solo un administrador lo reabre.',
+    sirve: 'Regla: un mes sigue abierto hasta el día 15 del mismo mes (es configurable) y el 16 se cierra solo. Solo un administrador lo reabre.',
     recibe: ['config', 'correos'], alimenta: ['registro', 'excel'],
     detalle: 'Si ese día nadie lo cerró a mano, la función de correos lo cierra y avisa. Aunque no lo hiciera, la base de datos bloquea cualquier escritura en un mes vencido.' },
   { id: 'bd', col: 'nucleo', icono: 'fa-database', titulo: 'Base de datos', ruta: null, roles: ['admin', 'digitador', 'usuario'],
@@ -227,7 +227,7 @@ export const GLOSARIO = [
   ['Registros esperados', 'Los que ya deberían existir: cada indicador por cada mes que ya venció o que ya tiene dato. El mes en curso sin dato todavía no cuenta.'],
   ['No llegó a la meta', 'Primer tipo de incumplimiento: se registró el dato, pero quedó por debajo de la meta.'],
   ['No se diligenció', 'Segundo tipo de incumplimiento: el mes venció y no se registró nada. En la cinta aparece rayado en rosa.'],
-  ['Mes vencido / cerrado', 'Un mes que ya pasó su último día para registrar (por defecto, el 15 del mes siguiente). No se puede modificar hasta que un administrador lo reabra.'],
+  ['Mes vencido / cerrado', 'Un mes que ya pasó su último día para registrar (por defecto, el 15 del mismo mes). No se puede modificar hasta que un administrador lo reabra.'],
   ['Mes reabierto', 'Un mes cerrado que un administrador volvió a abrir. Queda anotado quién lo hizo.'],
   ['Plan de acción', 'Lo que se hará para corregir o mantener el resultado. Es obligatorio en cada dato.'],
   ['Frecuencia de medición', 'Cada cuánto se mide el indicador (mensual, trimestral, semestral, anual).'],
@@ -284,7 +284,7 @@ export const GUIAS = [
     ] },
   { id: 'g-cierres', titulo: 'Cerrar y reabrir meses', icono: 'fa-lock', color: '#A91D3A', roles: ['admin'],
     pasos: [
-      ['Entiende la regla', 'Los meses se cierran solos después del día 15 del mes siguiente. No tienes que hacer nada para que se cierren.'],
+      ['Entiende la regla', 'Los meses se cierran solos después del día 15 del mismo mes. No tienes que hacer nada para que se cierren.'],
       ['Configuración → Cierres mensuales', 'Ves los 12 meses del año con su estado: "vencido automáticamente", "reabierto por un administrador" o abierto.'],
       ['Reabrir un mes', 'Pulsa "Reabrir" y confirma. Desde ese momento los digitadores pueden registrar de nuevo en ese mes. Queda anotado que fuiste tú.'],
       ['Volver a cerrarlo', 'Cuando terminen, pulsa "Cerrar ahora" para que quede bloqueado otra vez.'],
@@ -345,7 +345,7 @@ export const FAQ = [
   { roles: ['admin', 'digitador', 'usuario'], q: '¿Por qué un mes aparece rayado en rosa?', a: 'Porque venció (se cerró) y el indicador no tiene dato.',
     porRol: { admin: 'Porque venció (se cerró) y el indicador no tiene dato. Para corregirlo, reabre ese mes en Configuración → Cierres mensuales y pide que lo registren.', digitador: 'Porque venció (se cerró) y el indicador no tiene dato. Para corregirlo, pide a un administrador que reabra ese mes y luego lo registras tú.' } },
   { roles: ['admin', 'digitador'], q: '¿Qué pasa si escribo 0,95 en un indicador de porcentaje?', a: 'Escribe siempre 95 para 95 %. En la importación desde Excel, un número menor a 2 se toma como fracción (0,95 = 95 %) y la vista previa te muestra cómo lo entendió antes de guardar.' },
-  { roles: ['admin'], q: '¿Cuándo se envían los correos?', a: 'Solos: el día 2 (recordatorio a todos, con el resumen de cómo cerró el mes anterior), el día 13 (aviso a quienes tienen pendientes) y el día 16 (cierre, a todos). Si el despertador falla un día, la función lo recupera al siguiente. A mano, solo un administrador puede enviarlos, desde Configuración → Notificaciones.' },
+  { roles: ['admin'], q: '¿Cuándo se envían los correos?', a: 'Solos: el día 2 (recordatorio a todos, con el resumen de cómo va el mes anterior), el día 13 (aviso a quienes tienen pendientes) y el día 16 (cierre, a todos). Si el despertador falla un día, la función lo recupera al siguiente. A mano, solo un administrador puede enviarlos, desde Configuración → Notificaciones.' },
   { roles: ['digitador'], q: '¿Cuándo me llegan correos?', a: 'Si estás en la lista de "Involucrados" de un proceso y tienes los avisos activados: el día 2 de cada mes (qué falta registrar del mes anterior), el día 13 (faltan dos días para el último día, solo si todavía hay pendientes) y el día 16 (el mes se cerró).' },
   { roles: ['admin', 'digitador'], q: '¿Por qué el correo no tiene botones?', a: 'A propósito. Un correo sin enlaces no se puede suplantar con un botón falso. Para registrar datos se entra a la aplicación escribiendo la dirección en el navegador.' },
   { roles: ['admin'], q: '¿Quién puede ver los correos de las personas?', a: 'Solo los administradores. Digitadores y usuarios no ven la lista de involucrados.' },
@@ -354,7 +354,7 @@ export const FAQ = [
   { roles: ['admin'], q: '¿Qué hago si el logo no se ve en el correo?', a: 'Configuración → Notificaciones → "Publicar y comprobar logo". Si ahí se ve, el correo está bien: Outlook de escritorio bloquea imágenes hasta que el destinatario pulsa "Descargar imágenes" o agrega al remitente como seguro.' },
   { roles: ['admin'], q: '¿Cómo sé que el envío automático está funcionando?', a: 'En Configuración → Notificaciones hay un panel "Envío automático" que muestra cuándo fue la última vez que el despertador llamó, cuándo se envió el último recordatorio y las fechas de los próximos envíos. Si dice que lleva días sin llamar, revisa los secretos de GitHub.' },
   { roles: ['usuario'], q: '¿Puedo corregir o agregar un dato?', a: 'No: tu rol es de consulta. Si ves un dato que no es correcto, avísale a la persona que digita ese proceso o al administrador.' },
-  { roles: ['usuario'], q: '¿Qué significa el candado en la cinta de un indicador?', a: 'Que ese mes ya se cerró y no se puede modificar. Es normal: los meses se cierran solos después del día 15 del mes siguiente.' },
+  { roles: ['usuario'], q: '¿Qué significa el candado en la cinta de un indicador?', a: 'Que ese mes ya se cerró y no se puede modificar. Es normal: los meses se cierran solos después del día 15 del mismo mes.' },
   { roles: ['admin', 'digitador', 'usuario'], q: '¿Funciona en el celular?', a: 'Sí. En pantallas pequeñas el menú pasa a la barra inferior y las tablas se vuelven tarjetas apiladas. La matriz se desliza hacia los lados.' },
   { roles: ['admin'], q: '¿Y si alguien pierde la contraseña?', a: 'Configuración → Usuarios → "Nueva contraseña" en su fila: la aplicación genera una y te la muestra una sola vez para que se la entregues.' },
   { roles: ['admin'], q: '¿Qué pasa con los meses del libro que no traen plan de acción?', a: 'Se importan como históricos: no se les exige plan y seguirán apareciendo como «sin plan» en el Dashboard hasta que alguien lo complete. Lo que se registra desde la aplicación sí exige plan.' },
@@ -364,9 +364,9 @@ export const FAQ = [
   { roles: ['admin', 'digitador', 'usuario'], q: '¿Cómo encuentro algo rápido?', a: 'Pulsa Ctrl y K (o la tecla "/"). Escribe parte del nombre de un indicador, de una sección o de una acción y pulsa Enter. Funciona sin importar tildes ni mayúsculas.' },
   { roles: ['admin', 'digitador', 'usuario'], q: '¿Qué es la Matriz «Definición» y la de «Seguimiento»?', a: 'La Definición es la matriz de objetivos, metas e indicadores, igual que en el Excel (estrategia, objetivo, unidad, meta, frecuencia, responsable y fuente). El Seguimiento muestra los resultados mes a mes. Se cambia de una a otra arriba a la izquierda.' },
   { roles: ['admin', 'digitador'], q: '¿Por qué un indicador me pide dos números?', a: 'Porque su resultado sale de ellos: ejecutadas ÷ planeadas, numerador ÷ denominador, o la reducción frente al año anterior. Escribes los dos números y el resultado se calcula solo, con si cumple la meta. Si no tienes los dos números, puedes escribir el resultado directamente.' },
-  { roles: ['admin', 'digitador', 'usuario'], q: '¿Por qué no puedo editar un mes?', a: 'Porque está cerrado: pasó el último día para registrarlo (por defecto, el 15 del mes siguiente). Los meses cerrados se pueden ver, pero no cambiar, borrar ni mover. Solo un administrador puede reabrir un mes, y queda anotado quién lo hizo.' },
-  { roles: ['admin'], q: '¿Cómo sé quién cambió un dato o quién entró?', a: 'En Auditoría. "Actividad" muestra cada cambio con quién lo hizo, cuándo y el valor de antes y de después; "Accesos" muestra quién está en línea ahora y las entradas y salidas. Nadie puede borrar ni alterar ese registro, ni siquiera un administrador.' },
-  { roles: ['admin'], q: '¿Cuánto espacio queda en la base de datos?', a: 'En Auditoría → Espacio: cuánto se usa de los 500 MB del plan gratuito, qué tablas lo ocupan y en cuánto tiempo se llenaría con el ritmo de los últimos 60 días. Si cambias de plan, actualiza el límite ahí mismo.' },
+  { roles: ['admin', 'digitador', 'usuario'], q: '¿Por qué no puedo editar un mes?', a: 'Porque está cerrado: pasó el último día para registrarlo (por defecto, el 15 del mismo mes). Los meses cerrados se pueden ver, pero no cambiar, borrar ni mover. Solo un administrador puede reabrir un mes, y queda anotado quién lo hizo.' },
+  { roles: ['admin'], q: '¿Cómo sé quién cambió un dato o quién entró?', a: 'En la Bitácora. "Actividad" muestra cada cambio con quién lo hizo, cuándo y el valor de antes y de después; "Accesos" muestra quién está en línea ahora y las entradas y salidas. Nadie puede borrar ni alterar ese registro, ni siquiera un administrador.' },
+  { roles: ['admin'], q: '¿Cuánto espacio queda en la base de datos?', a: 'En la Bitácora → Espacio: cuánto se usa de los 500 MB del plan gratuito, qué tablas lo ocupan y en cuánto tiempo se llenaría con el ritmo de los últimos 60 días. Si cambias de plan, actualiza el límite ahí mismo.' },
   { roles: ['digitador', 'usuario'], q: '¿Y si pierdo la contraseña?', a: 'Pídele a un administrador que la restablezca.' },
 ];
 
@@ -394,7 +394,7 @@ export const PRUEBAS = [
   { id: 'p18', roles: ['admin'], titulo: 'Enviar el recordatorio real', pasos: ['Configuración → Notificaciones → "Enviar recordatorio ahora".', 'Confirma el aviso.'], esperado: 'Los involucrados de los procesos con pendientes reciben el correo con la lista de lo que falta. La aplicación te dice a cuántas personas llegó.' },
   { id: 'p19', roles: ['admin'], titulo: 'Comprobar el despertador diario', pasos: ['En GitHub, pestaña Actions → "Correos automáticos de indicadores" → "Run workflow".'], esperado: 'El flujo termina en verde. Si hoy no es día 2, 13 ni 16, no envía nada: eso es lo correcto.' },
   { id: 'p20', roles: ['admin', 'digitador', 'usuario'], titulo: 'Cerrar sesión y entrar con otro rol', pasos: ['Pulsa el botón de salir del menú.', 'Entra con una cuenta de otro rol.'], esperado: 'El menú y las pantallas cambian según el rol de la nueva cuenta.' },
-  { id: 'p21', roles: ['admin'], titulo: 'Comprobar el plazo del día 15', pasos: ['Mira la franja de colores de arriba: dice hasta qué día se puede registrar.', 'Configuración → Cierres mensuales: el mes anterior debe aparecer abierto.', 'Cuando pase el día 15, vuelve a mirar la franja y esa lista.'], esperado: 'Hasta el 15 inclusive el mes anterior se puede registrar; el 16 aparece cerrado, con candado, y solo un administrador puede reabrirlo.' },
+  { id: 'p21', roles: ['admin'], titulo: 'Comprobar el plazo del día 15', pasos: ['Mira la franja de colores de arriba: dice hasta qué día se puede registrar.', 'Configuración → Cierres mensuales: el mes en curso debe aparecer abierto y los anteriores, cerrados.', 'Cuando pase el día 15, vuelve a mirar la franja y esa lista.'], esperado: 'Hasta el 15 inclusive el mes en curso se puede registrar; el 16 aparece cerrado, con candado, y solo un administrador puede reabrirlo.' },
   { id: 'p22', roles: ['admin'], titulo: 'Importar el libro completo', pasos: ['Importar Excel → Libro de indicadores.', 'Elige el libro y espera la vista previa.', 'Revisa el cuadro de metas mensuales y los avisos.', 'Pulsa Importar a la aplicación y confirma.', 'Repite la importación con el mismo libro.'], esperado: 'La primera vez guarda lo que faltaba; la segunda dice «No hay nada que importar».' },
 ];
 
@@ -430,12 +430,12 @@ const META_LAMINAS = {
     pasos: ['Descarga la plantilla del mes: ya trae los indicadores listados.', 'Complétala: valor, análisis, causa y plan de acción (obligatorio).', 'Súbela. La aplicación revisa fila por fila y marca cada una como lista o con su error.', 'Los errores típicos: falta el plan, el mes está cerrado, el indicador no existe o la fila está repetida.', 'Confirma, y solo se guardan las filas válidas.'] } } },
   cierre: { roles: TODOS, porRol: {
     digitador: { titulo: 'Los meses se cierran solos', resumen: 'Cada mes se cierra en una fecha fija. Después de eso ya no puedes modificarlo.',
-      pasos: ['El mes en curso siempre está abierto.', 'La franja de colores que ves arriba, en todas las pantallas, dice hasta qué día se puede registrar y cuántos días quedan.', 'El mes anterior sigue abierto hasta el día 15 y el 16 se cierra solo.', 'Un mes cerrado no se puede modificar ni a mano ni con Excel. Lo verás con un candado.', 'Si necesitas corregir un mes cerrado, pídele a un administrador que lo reabra.', 'Por eso conviene registrar antes del día 15: los correos del día 2 y del día 13 te lo recuerdan.'] },
-    usuario: { titulo: 'Por qué algunos meses tienen candado', resumen: 'Los meses se cierran solos después del día 15 del mes siguiente y ya no se modifican.',
-      pasos: ['El mes en curso y el anterior (hasta el día 15) están abiertos.', 'La franja de colores de arriba, en todas las pantallas, te dice hasta qué día se puede registrar.', 'Pasado ese día el mes se cierra y aparece un candado en la cinta.', 'Un mes cerrado que quedó sin dato se ve rayado en rosa: significa que no se diligenció a tiempo.', 'Solo un administrador puede reabrir un mes.'] } } },
+      pasos: ['El mes en curso está abierto hasta el día 15.', 'La franja de colores que ves arriba, en todas las pantallas, dice hasta qué día se puede registrar y cuántos días quedan.', 'El mes anterior sigue abierto hasta el día 15 y el 16 se cierra solo.', 'Un mes cerrado no se puede modificar ni a mano ni con Excel. Lo verás con un candado.', 'Si necesitas corregir un mes cerrado, pídele a un administrador que lo reabra.', 'Por eso conviene registrar antes del día 15: los correos del día 2 y del día 13 te lo recuerdan.'] },
+    usuario: { titulo: 'Por qué algunos meses tienen candado', resumen: 'Los meses se cierran solos después del día 15 del mismo mes y ya no se modifican.',
+      pasos: ['Solo está abierto el mes en curso (hasta el día 15) y los que vienen: los meses que ya pasaron están cerrados.', 'La franja de colores de arriba, en todas las pantallas, te dice hasta qué día se puede registrar.', 'Pasado ese día el mes se cierra y aparece un candado en la cinta.', 'Un mes cerrado que quedó sin dato se ve rayado en rosa: significa que no se diligenció a tiempo.', 'Solo un administrador puede reabrir un mes.'] } } },
   correos: { roles: ['admin', 'digitador'], porRol: { digitador: {
     titulo: 'Los correos que recibirás', resumen: 'Si estás en la lista de un proceso, la aplicación te recuerda sola lo que falta.',
-    pasos: ['Día 2 de cada mes: qué indicadores de tu proceso faltan por registrar del mes anterior, con un resumen de cómo cerró.', 'Día 13 (faltan dos días para el último día): solo llega si todavía hay pendientes.', 'Día 16: el mes se cerró y te cuentan cómo quedó.', 'Los correos no tienen botones ni enlaces a propósito: para registrar, entra a la aplicación escribiendo la dirección.', 'Salen firmados solo con el cargo del Analista de Gestión Integral.'] } } },
+    pasos: ['Día 2 de cada mes: qué indicadores de tu proceso faltan por registrar este mes, con un resumen de cómo va.', 'Día 13 (faltan dos días para el último día): solo llega si todavía hay pendientes.', 'Día 16: el mes se cerró y te cuentan cómo quedó.', 'Los correos no tienen botones ni enlaces a propósito: para registrar, entra a la aplicación escribiendo la dirección.', 'Salen firmados solo con el cargo del Analista de Gestión Integral.'] } } },
   novedades: { roles: ['admin'] },
   roles: { roles: TODOS, porRol: {
     digitador: { titulo: 'Tu rol: Digitador', resumen: 'Registras datos y consultas. No configuras nada.',
@@ -460,8 +460,8 @@ const META_NODOS = {
 };
 const POR_ROL_NODOS = {
   cierre: {
-    digitador: { sirve: 'Regla: el mes se cierra solo después del día 15 del mes siguiente. Después de eso no puedes modificarlo.', detalle: 'Si necesitas corregir un mes cerrado, un administrador debe reabrirlo. La base de datos lo bloquea, no solo la pantalla.' },
-    usuario: { sirve: 'Regla: el mes se cierra solo después del día 15 del mes siguiente y ya no se modifica.', detalle: 'Por eso ves un candado en los meses cerrados y rayado rosa en los que quedaron sin dato.' },
+    digitador: { sirve: 'Regla: el mes se cierra solo después del día 15 del mismo mes. Después de eso no puedes modificarlo.', detalle: 'Si necesitas corregir un mes cerrado, un administrador debe reabrirlo. La base de datos lo bloquea, no solo la pantalla.' },
+    usuario: { sirve: 'Regla: el mes se cierra solo después del día 15 del mismo mes y ya no se modifica.', detalle: 'Por eso ves un candado en los meses cerrados y rayado rosa en los que quedaron sin dato.' },
   },
   roles: {
     digitador: { sirve: 'Tu rol es Digitador: registras datos y consultas, pero no configuras.', detalle: 'Lo que no puedes hacer no solo está escondido: la base de datos lo rechaza.' },

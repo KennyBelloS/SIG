@@ -3,7 +3,8 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useSesion } from '../lib/useSesion';
 import IndicadorChart, { TendenciaChart } from '../components/IndicadorChart';
 import PageHeader from '../components/PageHeader';
-import { usaComponentes, etiquetasDe, calcularValor, motivoSinCalculo, CALCULOS } from '../lib/calculo';
+import TablaMeses from '../components/TablaMeses';
+import { usaComponentes, tieneApoyo, etiquetasDe, calcularValor, motivoSinCalculo, CALCULOS } from '../lib/calculo';
 import { traducirError } from '../lib/indicadores';
 import { avisar } from '../lib/toast';
 import Dialogo, { Confirmar } from '../components/Dialogo';
@@ -109,6 +110,7 @@ export default function IndicadorDetalle() {
     setErrorForm(null);
     // Reglas de negocio: el valor y el plan de acción son siempre obligatorios.
     const porComp = usaComponentes(indicador);
+    const apoyoOpc = tieneApoyo(indicador) && (String(form.a ?? '') !== '' || String(form.b ?? '') !== '');
     const algunNumero = String(form.a ?? '') !== '' || String(form.b ?? '') !== '';
     const calc = porComp ? calcularValor(indicador, { a: form.a, b: form.b }) : null;
     if (porComp && algunNumero && calc == null) { setErrorForm(motivoSinCalculo(indicador, { a: form.a, b: form.b }) || `Escribe los dos números (${etiquetasDe(indicador).a} y ${etiquetasDe(indicador).b}) o déjalos vacíos y escribe el resultado.`); return; }
@@ -119,7 +121,7 @@ export default function IndicadorDetalle() {
       await guardarRegistro({
         indicador_id: Number(id), anio, mes: mesAbierto,
         valor: valorDelFormulario(),
-        componentes: porComp && algunNumero && calc != null ? { a: Number(form.a), b: Number(form.b) } : null,
+        componentes: porComp && algunNumero && calc != null ? { a: Number(form.a), b: Number(form.b) } : apoyoOpc ? { a: form.a === '' ? null : Number(form.a), b: form.b === '' ? null : Number(form.b) } : null,
         analisis: form.analisis, causa: form.causa, accion: form.accion,
         responsable_accion: form.responsable_accion, fecha_compromiso: form.fecha_compromiso || null,
         plan_sugerido: false,
@@ -245,6 +247,8 @@ export default function IndicadorDetalle() {
       </section>
 
       {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation"></i><span>{error}</span></div>}
+
+      <TablaMeses indicador={indicador} registros={registros} anio={anio} mesCerradoEn={mesCerradoEn} onAbrir={abrirMes} puedeRegistrar={!!sesion?.puedeRegistrar} />
 
       {stats && stats.mesesConDato > 0 && (
         <div className="cards cards-compactas">
@@ -395,7 +399,7 @@ export default function IndicadorDetalle() {
                 <i className="fa-solid fa-lock" aria-hidden="true"></i>
                 <div>
                   <strong>Este mes está cerrado: solo se puede ver.</strong>
-                  <p>Pasó el último día para registrarlo ({diaCierre} del mes siguiente). Así los resultados que ya se reportaron no cambian por error. {sesion?.esAdmin ? 'Como administrador puedes reabrirlo; quedará anotado quién lo hizo.' : 'Si hace falta corregirlo, pide a un administrador que lo reabra.'}</p>
+                  <p>Pasó el último día para registrarlo ({diaCierre} de ese mismo mes). Así los resultados que ya se reportaron no cambian por error. {sesion?.esAdmin ? 'Como administrador puedes reabrirlo; quedará anotado quién lo hizo.' : 'Si hace falta corregirlo, pide a un administrador que lo reabra.'}</p>
                   {sesion?.esAdmin && <button type="button" className="btn-secondary btn-chico" onClick={() => setReabriendo(true)}><i className="fa-solid fa-lock-open" aria-hidden="true"></i> Reabrir este mes</button>}
                 </div>
               </div>
@@ -444,6 +448,15 @@ export default function IndicadorDetalle() {
                 </small>
               </label>
               )}
+              {tieneApoyo(indicador) && (() => { const e = etiquetasDe(indicador); return (
+                <div className="calculo-bloque">
+                  <p className="calculo-formula"><i className="fa-solid fa-paperclip" aria-hidden="true"></i> Datos de apoyo (opcionales): se guardan junto al resultado y <strong>no lo cambian</strong>.</p>
+                  <div className="calculo-numeros">
+                    <label>{e.a}<input type="number" step="any" inputMode="decimal" value={form.a} onChange={ev => setForm(f => ({ ...f, a: ev.target.value }))} /></label>
+                    <label>{e.b}<input type="number" step="any" inputMode="decimal" value={form.b} onChange={ev => setForm(f => ({ ...f, b: ev.target.value }))} /></label>
+                  </div>
+                </div>
+              ); })()}
               <label>Análisis de cumplimiento
                 <textarea rows={3} value={form.analisis} onChange={e => setForm(f => ({ ...f, analisis: e.target.value }))} />
               </label>
@@ -474,7 +487,7 @@ export default function IndicadorDetalle() {
       )}
       {reabriendo && mesAbierto && (
         <Confirmar titulo={`¿Reabrir ${MESES[mesAbierto - 1]} ${anio}?`} textoBoton="Reabrir el mes"
-          texto="Se podrá volver a registrar y editar este mes en todos los indicadores hasta que se cierre otra vez. Queda anotado en la auditoría quién lo reabrió."
+          texto="Se podrá volver a registrar y editar este mes en todos los indicadores hasta que se cierre otra vez. Queda anotado en la bitácora quién lo reabrió."
           onCancelar={() => setReabriendo(false)}
           onConfirmar={async () => {
             try { await reabrirMes({ anio, mes: mesAbierto, reabierto_por: sesion?.email }); avisar(`${MESES[mesAbierto - 1]} reabierto.`, { tipo: 'ok' }); await cargar(); }

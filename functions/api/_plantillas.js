@@ -223,7 +223,7 @@ export function envolver({ eyebrow, titulo, acento = 'verde', cuerpoHtml, firmaD
 </body></html>`;
 }
 
-/* 1. Día 2 de cada mes: recordar diligenciar el mes anterior (a todos los procesos) */
+/* 1. Día 2 de cada mes: recordar diligenciar el mes en curso (a todos los procesos) */
 /** Franja con cómo cerró el mes en el proceso: cuántos cumplieron, cuántos no y cuántos faltan. */
 function franjaResumen(r, mesNombre, proceso) {
   if (!r || !r.total) return '';

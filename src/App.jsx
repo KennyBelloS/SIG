@@ -11,7 +11,11 @@ import Matriz from './pages/Matriz';
 import Informe from './pages/Informe';
 import Importar from './pages/Importar';
 import Ayuda from './pages/Ayuda';
+import InicioMovil from './pages/InicioMovil';
+import { useMovil } from './lib/movil';
 import { useSesion } from './lib/useSesion';
+import Actualizador from './components/Actualizador';
+import EntradaAnimada from './components/EntradaAnimada';
 
 function SoloAdmin({ sesion, children }) {
   if (!sesion?.esAdmin) return <Navigate to="/" replace />;
@@ -20,7 +24,8 @@ function SoloAdmin({ sesion, children }) {
 
 /** La raíz lleva a cada persona a su primer módulo: el administrador al Dashboard, los demás a la Matriz. */
 function Inicio({ sesion }) {
-  return <Navigate to={sesion?.esAdmin ? '/dashboard' : '/matriz'} replace />;
+  const movil = useMovil();   // en el teléfono la raíz es la pantalla de inicio de tarjetas
+  return <Navigate to={movil ? '/inicio' : sesion?.esAdmin ? '/dashboard' : '/matriz'} replace />;
 }
 
 /** Digitadores y administradores: quienes registran datos. */
@@ -33,12 +38,14 @@ export default function App() {
   const { cargando, sesion } = useSesion();
 
   if (cargando) return <div className="pantalla-carga">Cargando…</div>;
-  if (!sesion) return <Login />;
+  if (!sesion) return <><Login /><Actualizador conSesion={false} /></>;
 
   return (
+    <>
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Inicio sesion={sesion} />} />
+        <Route path="/inicio" element={<InicioMovil />} />
         <Route path="/indicadores" element={<Indicadores />} />
         <Route path="/indicadores/:id" element={<IndicadorDetalle />} />
         <Route path="/matriz" element={<Matriz />} />
@@ -49,8 +56,12 @@ export default function App() {
         <Route path="/resumen" element={<Navigate to="/dashboard" replace />} />
         <Route path="/novedades" element={<SoloAdmin sesion={sesion}><Novedades /></SoloAdmin>} />
         <Route path="/configuracion" element={<SoloAdmin sesion={sesion}><Configuracion /></SoloAdmin>} />
-        <Route path="/auditoria" element={<SoloAdmin sesion={sesion}><Auditoria /></SoloAdmin>} />
+        <Route path="/bitacora" element={<SoloAdmin sesion={sesion}><Auditoria /></SoloAdmin>} />
+        <Route path="/auditoria" element={<Navigate to="/bitacora" replace />} />
       </Route>
     </Routes>
+    <EntradaAnimada nombre={sesion.nombre} />
+    <Actualizador conSesion />
+    </>
   );
 }

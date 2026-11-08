@@ -10,7 +10,7 @@ const PUNTOS = {
   admin: [
     ['fa-chart-pie', 'El Dashboard', 'te muestra el año entero de un vistazo: qué cumple, qué no y qué falta.'],
     ['fa-sliders', 'Configuración', 'es donde creas usuarios, cargas el libro de Excel y decides cuándo se cierra cada mes.'],
-    ['fa-shield-halved', 'La Auditoría', 'te dice quién cambió qué, quién entró y cuánto espacio queda.'],
+    ['fa-book-open', 'La Bitácora', 'te dice quién cambió qué, quién entró y cuánto espacio queda.'],
   ],
   digitador: [
     ['fa-chart-simple', 'Indicadores', 'te muestra el mes como un plano: toca una casilla para registrar su resultado.'],
@@ -42,14 +42,14 @@ export default function BienvenidaTour() {
     window.addEventListener('indicadores:tour', abrir);
     return () => window.removeEventListener('indicadores:tour', abrir);
   }, []);
-  const cerrar = () => { try { localStorage.setItem(CLAVE, '1'); } catch { /* nada */ } setAbierto(false); };
+  const cerrar = () => { try { localStorage.setItem(CLAVE, '1'); } catch { /* nada */ } setAbierto(false); window.dispatchEvent(new Event('tm:tour-cerrado')); };
   if (!abierto) return null;
   const rol = sesion?.rol || 'usuario';
   const primero = sesion?.nombre ? sesion.nombre.split(/\s+/)[0] : null;
   return (
     <Dialogo titulo="Bienvenida" onCerrar={cerrar} ancho={520} className="tour-compacto">
       <div className="tour-cuerpo" tabIndex={0} role="region" aria-label="Contenido de la bienvenida">
-        <h2><i className="fa-solid fa-seedling" aria-hidden="true"></i> Bienvenido{primero ? `, ${primero}` : ' a Indicadores de Gestión'}</h2>
+        <h2><i className="fa-solid fa-seedling" aria-hidden="true"></i> Bienvenido{primero ? `, ${primero}` : ' al Sistema de Gestión'}</h2>
         <p className="tour-rol">Entras como <strong>{ROLES[rol]?.nombre || 'Usuario'}</strong>. Tres cosas para empezar:</p>
         <ul className="tour-puntos">{(PUNTOS[rol] || PUNTOS.usuario).map(([ic, t, d]) => <li key={t}><i className={`fa-solid ${ic}`} aria-hidden="true"></i><span><strong>{t}</strong> {d}</span></li>)}</ul>
         <p className="tour-atajo">Para encontrar cualquier cosa, pulsa <kbd>Ctrl</kbd> <kbd>K</kbd>. La franja amarilla de arriba dice hasta qué día se puede registrar.</p>

@@ -43,18 +43,16 @@ export async function getCierre(anio, mes) {
   return data; // null = abierto (nunca se ha cerrado)
 }
 
-/** ¿El mes ya venció? Vence cuando pasó su fecha de cierre: cualquier mes
- *  anterior al pasado, o el mes pasado si ya estamos en o después del día de
- *  cierre. El mes en curso y los futuros nunca están vencidos. */
-/** El mes anterior sigue abierto HASTA el día `diaCierre` (inclusive) y se cierra al día siguiente.
- *  Ejemplo con 15: el 15 de noviembre octubre aún se puede registrar; el 16 ya está cerrado. */
+/** Cada mes se puede registrar HASTA el día `diaCierre` (inclusive) de ese mismo mes y se cierra al día siguiente.
+ *  Los meses que ya pasaron están cerrados. Ejemplo con 15: el 7 de noviembre solo están abiertos noviembre y diciembre;
+ *  el 16 de noviembre ya se cerró noviembre. Los meses por venir no se han cerrado. */
 export function mesVencido(anio, mes, diaCierre = 15, hoy = new Date()) {
   const anioHoy = hoy.getFullYear(), mesHoy = hoy.getMonth() + 1;
   if (anio > anioHoy) return false;
   if (anio < anioHoy) return true;
-  if (mes >= mesHoy) return false;
-  if (mes === mesHoy - 1) return hoy.getDate() > diaCierre;
-  return true;
+  if (mes > mesHoy) return false;
+  if (mes < mesHoy) return true;
+  return hoy.getDate() > diaCierre;
 }
 
 /** Estado real de un mes: manda la decisión del administrador si existe;
@@ -245,12 +243,11 @@ export function desviacionVsMeta(indicador, valor, mes) {
   return { diff, favorable, texto: `${diff > 0 ? '+' : ''}${formatearValor(indicador, diff)}` };
 }
 
+/** El mes que se registra es el mes EN CURSO: se llena durante el mes y se cierra después del día 15 de ese mismo mes. */
 export function mesReporteActual(fecha = new Date()) {
   const anio = fecha.getFullYear();
   const mesActual = fecha.getMonth() + 1;
-  const mesReporte = mesActual === 1 ? 12 : mesActual - 1;
-  const anioReporte = mesActual === 1 ? anio - 1 : anio;
-  return { anio, mesActual, anioReporte, mesReporte };
+  return { anio, mesActual, anioReporte: anio, mesReporte: mesActual };
 }
 
 // --- Plan de acción sugerido --------------------------------------------------
@@ -924,7 +921,7 @@ export async function getRegistrosAnioCompletos(anio) {
 
 
 // ---------------------------------------------------------------------------------------------
-// Auditoría, accesos y espacio (solo administradores; la base lo hace cumplir)
+// Bitácora, accesos y espacio (solo administradores; la base lo hace cumplir)
 // ---------------------------------------------------------------------------------------------
 
 /** Actividad: quién cambió qué. `tipos` filtra por clase de cambio; `desde` es una fecha ISO. */
@@ -955,4 +952,38 @@ export async function getAlmacenamiento() {
 export async function guardarLimiteAlmacenamiento(mb) {
   const { error } = await supabase.from('indicadores_configuracion').update({ almacenamiento_limite_mb: mb }).eq('id', 1);
   if (error) throw error;
+}
+
+
+/** ¿El resultado pasó la meta máxima (la banda del Excel, p. ej. 95 % a 110 %)? No cambia si cumple: es una señal de que se excedió. */
+export function superaMaximo(ind, valor) {
+  return ind?.meta_maxima != null && valor != null && Number(valor) > Number(ind.meta_maxima) + 1e-12;
+}
+
+
+/** Cómo va el mes por proceso, para la pantalla de inicio del celular: cuántos indicadores hay, cuántos ya se registraron y cómo van contra su meta. */
+export async function getResumenMes(anio, mes) {
+  const [inds, procs, regs, cierres, cfg] = await Promise.all([
+    getIndicadores(), getProcesos(),
+    supabase.from('indicadores_registros').select('indicador_id, valor, accion').eq('anio', anio).eq('mes', mes).then(r => { if (r.error) throw r.error; return r.data || []; }),
+    getCierresDelAnio(anio), getConfiguracionNotificaciones().catch(() => null),
+  ]);
+  const reg = new Map(regs.map(r => [r.indicador_id, r]));
+  const t = { indicadores: 0, registrados: 0, cumplen: 0, noCumplen: 0, pendientes: 0, sinPlan: 0 };
+  const porProceso = procs.map(p => {
+    const lista = inds.filter(i => i.proceso_id === p.id);
+    const items = lista.map(i => {
+      const r = reg.get(i.id), v = r?.valor;
+      if (v == null) return { id: i.id, nombre: i.nombre, estado: 'pendiente' };
+      const c = cumpleMeta(i, v, mes);
+      return { id: i.id, nombre: i.nombre, estado: c === true ? 'cumple' : c === false ? 'no' : 'sinmeta', sinPlan: c === false && !String(r.accion || '').trim() };
+    });
+    const x = { id: p.id, nombre: p.nombre, total: items.length, items };
+    x.registrados = items.filter(i => i.estado !== 'pendiente').length; x.cumplen = items.filter(i => i.estado === 'cumple').length;
+    x.noCumplen = items.filter(i => i.estado === 'no').length; x.pendientes = x.total - x.registrados;
+    return x;
+  }).filter(p => p.total > 0);
+  for (const p of porProceso) { t.indicadores += p.total; t.registrados += p.registrados; t.cumplen += p.cumplen; t.noCumplen += p.noCumplen; t.pendientes += p.pendientes; t.sinPlan += p.items.filter(i => i.sinPlan).length; }
+  const diaCierre = cfg?.dia_cierre ?? 15;
+  return { anio, mes, porProceso, totales: t, diaCierre, cerrado: estaCerrado(anio, mes, cierres, diaCierre) };
 }

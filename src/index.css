@@ -37,8 +37,6 @@
   --borde:var(--line); --borde-fuerte:var(--line-strong); --lienzo:var(--sheet); --fondo:var(--canvas);
   --r-sm:var(--r-2); --r-md:var(--r-3); --r-xs:var(--r-1); --r-lg:var(--r-3);
   /* Tipografía */
-  --display:'Bricolage Grotesque Variable','Bricolage Grotesque',system-ui,sans-serif;
-  --texto:'Hanken Grotesk Variable','Hanken Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;
 }
 
 *,*::before,*::after{ box-sizing:border-box; }

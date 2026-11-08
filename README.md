@@ -1,4 +1,4 @@
-# Indicadores de Gestión · Finca Torremolinos
+# Sistema de Gestión · Finca Torremolinos
 
 Aplicación web para el seguimiento mensual del Sistema Integrado de Gestión: 42 indicadores en 9 procesos,
 con metas anual y mensual, plan de acción obligatorio, matriz, dashboard, informe mensual en PDF, importación
@@ -37,7 +37,7 @@ indicador) y el Dashboard abre con el mapa del año. Tipografías: Big Shoulders
 - **Matriz idéntica al Excel** (encabezado, columnas, versión) con descarga en ese formato, y el seguimiento mes a mes en la otra pestaña.
 - **Forma de cálculo por indicador**: unos se digitan y otros salen de dos números (ejecutadas ÷ planeadas, numerador ÷ denominador, reducción frente al año anterior).
 - **Importación del libro de Excel completo** con vista previa, modos «completar» y «reemplazar», meta mensual y corrección de las fórmulas del libro que están mal.
-- **Auditoría** (solo administradores): quién cambió qué con el antes y el después, quién entra y sale, quién está en línea, y el espacio de la base de datos con su estimación.
+- **Bitácora** (solo administradores): quién cambió qué con el antes y el después, quién entra y sale, quién está en línea, y el espacio de la base de datos con su estimación.
 - **Meses cerrados**: no se pueden cambiar, borrar ni mover (lo hace cumplir la base de datos); solo un administrador los reabre.
 - **Nombre de usuario** editable, **buscador** con Ctrl K y una bienvenida compacta.
 - El diseño está documentado en `docs/DISENO.md`.
@@ -122,7 +122,7 @@ Para comprobarlo: pestaña Actions → *Run workflow*.
 
 ## Reglas de negocio que conviene saber
 - **Plan de acción obligatorio** en cada dato, aunque el indicador cumpla (pantalla, importación y base de datos).
-- Un mes se puede registrar hasta el **día 15 del mes siguiente** (inclusive; es configurable) y **el 16 se cierra solo**. Lo aplica la base de datos; solo un administrador lo reabre.
+- Un mes se puede registrar hasta el **día 15 del mismo mes** (inclusive; es configurable) y **el 16 se cierra solo**. Lo aplica la base de datos; solo un administrador lo reabre.
 - Hay **dos tipos de incumplimiento**: no llegar a la meta y no diligenciar. Se miden por separado.
 - Meta anual y mensual son independientes; "Meta que rige" decide con cuál se calcula el cumplimiento.
 - Los correos salen firmados **solo con el cargo**, sin nombre de persona, y **sin enlaces** a propósito.

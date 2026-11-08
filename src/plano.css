@@ -11,8 +11,6 @@
    ===================================================================== */
 
 :root{
-  --display:'Big Shoulders Display Variable','Big Shoulders Display','Arial Narrow',Impact,sans-serif;
-  --texto:'Source Sans 3 Variable','Source Sans 3',system-ui,-apple-system,'Segoe UI',sans-serif;
   /* formas: casi rectas; solo lo que flota se redondea apenas */
   --r-1:2px; --r-2:3px; --r-3:4px;
   --pop:0 24px 48px -18px rgba(11,46,26,.5), 0 0 0 2px var(--f-900);
@@ -216,7 +214,7 @@ button.mm-cama:hover{ outline:3px solid var(--f-900); outline-offset:1px; }
 .acceso-creado-cab{ display:flex; gap:10px; align-items:center; color:var(--ok); font-size:16px; }
 .acceso-creado dl{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:var(--s-4); width:100%; }
 .acceso-creado dt{ font-size:12.5px; font-weight:700; color:var(--ink-2); } .acceso-creado dd{ font-weight:700; word-break:break-all; }
-.clave-visible{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:1.05em; letter-spacing:.04em; background:#fff; border:2px dashed var(--ok); padding:2px 8px; border-radius:var(--r-1); display:inline-block; }
+.clave-visible{ font-family:var(--fuente); font-size:1.15em; font-weight:600; letter-spacing:.08em; background:#fff; border:2px dashed var(--ok); padding:2px 8px; border-radius:var(--r-1); display:inline-block; }
 .clave-grande{ font-size:22px; padding:12px 16px; margin:var(--s-3) 0; text-align:center; width:100%; }
 .celda-acciones{ white-space:nowrap; text-align:right; } .celda-acciones .btn-texto{ display:inline-flex; gap:6px; align-items:center; }
 .btn-peligro{ color:var(--wine); } .btn-peligro:hover{ background:var(--wine-bg); color:var(--wine); }
@@ -576,3 +574,178 @@ td.celda-principal small{ display:block; }
 
 .aviso-rol{ display:flex; gap:14px; align-items:center; flex-wrap:wrap; padding:12px var(--s-6); background:#FDF1F4; border-bottom:3px solid var(--wine); color:var(--ink); }
 .aviso-rol > i{ color:var(--wine); font-size:20px; } .aviso-rol > div{ flex:1 1 320px; font-size:14px; }
+
+/* cuadro de edición del indicador: por secciones, como lo cuenta el Excel */
+.form-indicador{ max-height:min(82vh,860px); overflow:auto; padding-right:6px; }
+.grupo-form{ border:0; border-top:3px solid var(--f-900); margin:var(--s-4) 0 0; padding:var(--s-3) 0 0; min-width:0; }
+.grupo-form legend{ font:800 22px/1 var(--display); color:var(--f-900); padding:0 10px 0 0; float:left; width:100%; margin-bottom:var(--s-3); }
+.grupo-form .config-grid-form{ clear:both; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 16px; }
+.form-indicador .campo-ancho, .grupo-form .campo-ancho{ grid-column:1 / -1; }
+.form-indicador label{ display:flex; flex-direction:column; gap:5px; font-weight:700; font-size:13.5px; }
+.metas-mes{ display:grid; gap:10px; padding:12px; background:#FAF9F4; border-left:5px solid var(--gold); border-radius:var(--r-1); }
+.metas-mes-grid{ display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
+.metas-mes-grid label{ font-size:12.5px; } .metas-mes-grid input{ min-height:38px; padding:6px 8px; }
+.ind-check{ flex-direction:row !important; align-items:center; gap:10px !important; font-weight:700; cursor:pointer; }
+.ind-check input{ width:18px; height:18px; min-height:0; flex:none; }
+@media (max-width:640px){ .grupo-form .config-grid-form{ grid-template-columns:1fr; } .metas-mes-grid{ grid-template-columns:repeat(3,minmax(0,1fr)); } }
+
+/* la tabla de cada hoja del Excel, mes por mes */
+.tabla-excel{ width:100%; min-width:900px; border-collapse:collapse; font:400 14px/1.3 var(--texto); font-variant-numeric:tabular-nums; }
+.tabla-excel th, .tabla-excel td{ border:1px solid #1f1f1f; padding:8px 6px; text-align:center; }
+.tabla-excel thead th{ background:#F2F2F2; font-weight:700; padding:0; }
+.tabla-excel thead button{ width:100%; min-height:42px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:5px; }
+.tabla-excel thead button:hover{ background:var(--f-100); }
+.tabla-excel tbody th{ text-align:left; background:#F2F2F2; font-weight:700; min-width:96px; padding-left:10px; }
+.tabla-excel .te-apoyo td{ color:var(--ink-2); background:#FCFBF7; }
+.tabla-excel .te-resultado td{ font-weight:700; }
+.te-ok{ background:#E4F2E9; color:var(--ok); } .te-mal{ background:#FBEAEE; color:var(--wine); }
+.te-perdido{ background:repeating-linear-gradient(135deg,#F2D3DA 0 3px,#FAE9ED 3px 7px); color:var(--wine); } .te-pendiente{ background:#fff; }
+.te-valor small{ display:block; font-size:11.5px; color:var(--gold-ink); font-weight:700; }
+
+/* =====================================================================
+   ENTRADA: el campo de rosas. Un rosal por proceso, que crece al llegar.
+   ===================================================================== */
+.entrada{ min-height:100vh; min-height:100dvh; display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); background:var(--canvas); }
+.entrada-marca{ position:relative; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-start; padding:clamp(28px,5vh,56px) clamp(28px,5vw,72px) 0; background:linear-gradient(160deg,#0F3D22 0%,#0B2E1A 70%); color:#fff; }
+.entrada-luz{ position:absolute; inset:-30%; background:radial-gradient(40% 35% at 30% 25%,rgba(63,174,98,.30),transparent 70%), radial-gradient(35% 30% at 80% 70%,rgba(201,147,43,.20),transparent 70%); animation:luz-deriva 16s ease-in-out infinite alternate; }
+@keyframes luz-deriva{ to{ transform:translate(6%,4%) scale(1.08); } }
+.entrada-marca > *{ position:relative; z-index:1; }
+.entrada-logo{ width:clamp(78px,11vh,112px); height:clamp(78px,11vh,112px); border-radius:18px; object-fit:cover; background:#fff; animation:logo-entra .8s var(--curva-resorte) both; }
+@keyframes logo-entra{ from{ opacity:0; transform:scale(.6) rotate(-8deg); } }
+.entrada-marca h1{ font:800 clamp(64px,10.5vh,132px)/.86 var(--display); letter-spacing:.005em; margin:clamp(18px,4vh,40px) 0 0; color:#fff; text-wrap:balance; }
+.entrada-marca h1 span{ display:inline-block; animation:palabra-sube .9s var(--curva) both; animation-delay:calc(.25s + var(--w) * .14s); }
+@keyframes palabra-sube{ from{ opacity:0; transform:translateY(46px) rotate(2deg); clip-path:inset(0 0 100% 0); } to{ clip-path:inset(-20% -5% -20% -5%); } }
+.entrada-lema{ max-width:40ch; margin-top:clamp(12px,2.4vh,22px); font-size:clamp(14.5px,2vh,17px); line-height:1.55; color:rgba(255,255,255,.88); animation:revela .8s var(--curva) .75s both; }
+.entrada-modulos{ display:flex; flex-wrap:wrap; gap:10px; list-style:none; margin:clamp(12px,2.4vh,22px) 0 0; padding:0; animation:revela .8s var(--curva) .95s both; }
+.entrada-modulos li{ display:inline-flex; align-items:center; gap:8px; padding:7px 14px; border-radius:3px; font-size:13.5px; font-weight:700; border:1.5px solid rgba(255,255,255,.4); }
+.entrada-modulos .activo{ background:var(--gold); border-color:var(--gold); color:var(--f-950); }
+.entrada-modulos .pronto{ border-style:dashed; color:rgba(255,255,255,.88); }
+.entrada-campo{ position:absolute; left:0; right:0; bottom:0; width:100%; height:44%; min-height:190px; z-index:0; pointer-events:none; }
+.rosal-tallo{ animation:tallo-crece 1.5s var(--curva) both; animation-delay:calc(.5s + var(--i) * .13s); }
+@keyframes tallo-crece{ from{ transform:scaleY(0); } }
+.rosal-flor{ animation:flor-abre .9s var(--curva-resorte) both, flor-late 5s ease-in-out infinite; animation-delay:calc(1.4s + var(--i) * .13s), calc(2.6s + var(--i) * .3s); }
+@keyframes flor-abre{ from{ opacity:0; transform:scale(0) rotate(-40deg); } }
+@keyframes flor-late{ 50%{ transform:scale(1.07); } }
+.rosal{ animation:rosal-mece 6.5s ease-in-out infinite; animation-delay:calc(2s + var(--i) * -.7s); }
+@keyframes rosal-mece{ 0%,100%{ transform:rotate(-1.6deg); } 50%{ transform:rotate(1.6deg); } }
+.entrada-petalos i{ position:absolute; top:-24px; width:11px; height:7px; border-radius:50% 0 50% 50%; background:#D4415F; opacity:0; z-index:0; left:calc(8% + var(--i) * 10%); animation:petalo-cae calc(9s + var(--i) * 1.1s) linear infinite; animation-delay:calc(var(--i) * -1.7s); }
+.entrada-petalos i:nth-child(3n){ background:var(--gold); } .entrada-petalos i:nth-child(4n){ background:#fff; }
+@keyframes petalo-cae{ 0%{ opacity:0; transform:translate(0,-10px) rotate(0); } 10%{ opacity:.75; } 90%{ opacity:.6; } 100%{ opacity:0; transform:translate(70px,105vh) rotate(540deg); } }
+.entrada-pie{ position:absolute; left:clamp(28px,5vw,72px); bottom:14px; z-index:2; font-size:12.5px; color:rgba(255,255,255,.85); }
+
+.entrada-acceso{ display:grid; place-items:center; padding:var(--s-6) var(--s-5); }
+.entrada-form{ width:100%; max-width:400px; display:flex; flex-direction:column; gap:var(--s-4); animation:form-entra .8s var(--curva) .2s both; }
+@keyframes form-entra{ from{ opacity:0; transform:translateX(26px); } }
+.entrada-form.sacude{ animation:sacude .5s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes sacude{ 10%,90%{ transform:translateX(-2px); } 20%,80%{ transform:translateX(4px); } 30%,50%,70%{ transform:translateX(-8px); } 40%,60%{ transform:translateX(8px); } }
+.entrada-saludo{ font-size:14px; font-weight:700; color:var(--gold-ink); }
+.entrada-form header h2{ font:800 44px/1 var(--display); color:var(--f-900); margin:2px 0 6px; }
+.entrada-form header p:last-child{ color:var(--ink-2); font-size:14px; }
+.entrada-form label{ display:flex; flex-direction:column; gap:6px; font-size:13.5px; font-weight:700; color:var(--ink-2); }
+.entrada-form .campo-icono{ position:relative; }
+.entrada-form .campo-icono > i:first-child{ position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--ink-3); transition:color var(--mov-rapido); }
+.entrada-form .campo-icono:focus-within > i:first-child{ color:var(--f-800); }
+.entrada-form .campo-icono input{ width:100%; min-height:50px; padding-left:42px; padding-right:46px; font-size:15.5px; transition:border-color var(--mov-rapido), box-shadow var(--mov-medio); }
+.entrada-form .campo-icono input:focus{ box-shadow:0 5px 0 -2px var(--gold); }
+.entrada-form .ver-clave{ position:absolute; right:4px; top:50%; transform:translateY(-50%); width:44px; height:44px; color:var(--ink-2); border-radius:var(--r-2); }
+.entrada-form .ver-clave:hover{ background:var(--f-100); color:var(--f-900); }
+.entrada-mayus{ min-height:18px; font-size:12.5px; color:var(--wine); font-weight:700; }
+.entrada-recordar{ flex-direction:row !important; align-items:center; gap:10px !important; font-weight:400 !important; cursor:pointer; }
+.entrada-recordar input{ width:18px; height:18px; min-height:0; }
+.entrada-boton{ min-height:52px; font-size:16px; letter-spacing:.01em; gap:10px; }
+.entrada-boton i.fa-arrow-right-long{ transition:transform var(--mov-medio) var(--curva); }
+.entrada-boton:hover:not(:disabled) i.fa-arrow-right-long{ transform:translateX(6px); }
+.entrada-ayuda{ font-size:13px; color:var(--ink-3); text-align:center; }
+@media (max-width:900px){
+  .entrada{ grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+  .entrada-marca{ padding:22px 22px 150px; min-height:340px; }
+  .entrada-logo, .entrada-modulos, .entrada-pie{ display:none; }
+  .entrada-marca h1{ font-size:clamp(46px,14vw,72px); margin-top:0; }
+  .entrada-lema{ font-size:14px; max-width:34ch; }
+  .entrada-campo{ height:130px; min-height:0; }
+  .entrada-acceso{ align-items:start; padding-top:var(--s-5); }
+}
+@media (max-height:640px) and (min-width:901px){ .entrada-lema, .entrada-modulos{ display:none; } .entrada-marca h1{ font-size:clamp(52px,12vh,80px); } }
+@media (prefers-reduced-motion:reduce){ .entrada-luz, .entrada-petalos i{ animation:none; } .entrada-petalos{ display:none; } }
+
+/* =====================================================================
+   ENTRADA ANIMADA, ACTUALIZACIÓN AUTOMÁTICA Y LLEGADA DE LA APLICACIÓN
+   ===================================================================== */
+.entrada-anim{ position:fixed; inset:0; z-index:500; background:linear-gradient(160deg,#0F3D22,#0B2E1A 75%); color:#fff; display:grid; place-items:center; cursor:pointer; clip-path:circle(150% at 50% 55%); }
+.entrada-anim.abre{ animation:cortina-abre .9s cubic-bezier(.7,0,.2,1) forwards; pointer-events:none; }
+@keyframes cortina-abre{ to{ clip-path:circle(0% at 50% 55%); } }
+.entrada-anim-centro{ position:relative; z-index:2; text-align:center; padding:0 20px; margin-top:-8vh; }
+.entrada-anim-logo{ width:clamp(84px,14vh,124px); height:clamp(84px,14vh,124px); border-radius:20px; background:#fff; object-fit:cover; animation:logo-entra .8s var(--curva-resorte) both; box-shadow:0 18px 50px -12px rgba(0,0,0,.55); }
+.entrada-anim-hola{ margin-top:clamp(14px,3vh,26px); font-size:clamp(15px,2.2vh,19px); font-weight:700; color:var(--gold); animation:revela .7s var(--curva) .35s both; }
+.entrada-anim-titulo{ font:800 clamp(52px,9vh,96px)/.9 var(--display); letter-spacing:.005em; margin-top:6px; animation:palabra-sube .9s var(--curva) .5s both; }
+.entrada-anim-sub{ margin-top:14px; font-size:14px; color:rgba(255,255,255,.8); animation:revela .7s var(--curva) .9s both; }
+.entrada-anim-campo{ position:absolute; left:0; right:0; bottom:0; width:100%; height:46%; min-height:200px; z-index:1; pointer-events:none; }
+.entrada-anim .rosal-tallo{ animation-duration:.9s; animation-delay:calc(.2s + var(--i) * .07s); }
+.entrada-anim .rosal-flor{ animation-delay:calc(.75s + var(--i) * .07s), calc(1.6s + var(--i) * .2s); }
+
+/* la barra y la franja llegan con la aplicación */
+.mast{ animation:mast-baja .8s var(--curva) both; }
+@keyframes mast-baja{ from{ transform:translateY(-100%); } }
+.mast-grupo{ animation:revela .6s var(--curva) both; animation-delay:calc(.3s + var(--g, 0) * .12s); }
+.franja{ animation:franja-entra .8s var(--curva) .25s both; }
+@keyframes franja-entra{ from{ opacity:0; transform:translateY(-14px); } }
+
+/* parallax del login: el campo de rosas y la luz siguen suavemente al ratón */
+.entrada-marca{ --mx:0; --my:0; }
+.entrada-campo{ left:-24px; right:-24px; width:calc(100% + 48px); transform:translate3d(calc(var(--mx) * -14px), calc(var(--my) * -4px), 0); transition:transform .5s cubic-bezier(.2,.8,.2,1); }
+.entrada-luz{ transform:translate3d(calc(var(--mx) * 22px), calc(var(--my) * 14px), 0); transition:transform 1s ease-out; animation:none; }
+.entrada-logo{ translate:calc(var(--mx) * 8px) calc(var(--my) * 6px); transition:translate .5s ease-out; }
+
+/* aviso de versión nueva */
+.aviso-version{ position:fixed; z-index:400; left:50%; bottom:20px; transform:translateX(-50%); display:flex; align-items:center; gap:14px; flex-wrap:wrap; max-width:min(680px,calc(100vw - 24px)); padding:12px 16px; background:var(--f-900); color:#fff; border-radius:var(--r-3); border-left:6px solid var(--gold); box-shadow:0 20px 40px -14px rgba(0,0,0,.6); animation:aviso-sube .5s var(--curva-resorte) both; }
+@keyframes aviso-sube{ from{ opacity:0; transform:translate(-50%,24px); } }
+.aviso-version > i{ color:var(--gold); font-size:20px; animation:giro 2.4s linear infinite; } @keyframes giro{ to{ transform:rotate(360deg); } }
+.aviso-version > div{ flex:1 1 220px; display:grid; gap:2px; } .aviso-version span{ font-size:13px; color:rgba(255,255,255,.85); }
+.aviso-version .btn-texto{ color:#fff; text-decoration:underline; }
+.novedades-version h2 i{ color:var(--gold); margin-right:8px; }
+.novedades-version ul{ list-style:none; display:grid; gap:10px; margin:var(--s-3) 0 var(--s-4); padding:0; }
+.novedades-version li{ display:flex; gap:12px; padding:10px 12px; background:#FAF9F4; border-left:4px solid var(--gold); border-radius:var(--r-1); }
+.novedades-version li > i{ color:var(--f-800); margin-top:3px; width:20px; text-align:center; }
+@media (max-width:1100px){ .aviso-version{ bottom:calc(88px + env(safe-area-inset-bottom)); } }
+@media (prefers-reduced-motion:reduce){ .aviso-version > i{ animation:none; } .entrada-anim{ display:none; } }
+
+/* =====================================================================
+   LA HOJA DEL INDICADOR: el editor. Pestañas, tabla del Excel y vista previa en vivo.
+   ===================================================================== */
+.editor-hoja{ display:flex; flex-direction:column; gap:var(--s-3); max-height:calc(100vh - 80px); max-height:calc(100dvh - 80px); }
+.editor-cab{ border-bottom:4px solid var(--f-900); padding-bottom:var(--s-3); }
+.editor-sello{ font-size:12px; font-weight:700; letter-spacing:.06em; color:var(--ink-3); }
+.editor-cab h2{ font:800 clamp(30px,3.4vw,44px)/1 var(--display); color:var(--f-900); margin:4px 0; text-wrap:balance; }
+.editor-sub{ font-size:13.5px; color:var(--ink-2); }
+.editor-proceso{ display:flex; flex-direction:column; gap:4px; margin-top:10px; max-width:360px; font-weight:700; font-size:13.5px; }
+.editor-pestanas{ display:flex; gap:4px; flex-wrap:wrap; border-bottom:1px solid var(--line-strong); }
+.editor-pestanas button{ position:relative; display:inline-flex; align-items:center; gap:8px; padding:11px 16px; min-height:44px; font-weight:700; font-size:14px; color:var(--ink-2); border-radius:var(--r-2) var(--r-2) 0 0; }
+.editor-pestanas button i{ color:var(--f-800); }
+.editor-pestanas button:hover{ background:var(--f-100); color:var(--f-900); }
+.editor-pestanas button[aria-selected="true"]{ background:var(--f-900); color:#fff; } .editor-pestanas button[aria-selected="true"] i{ color:var(--gold); }
+.editor-cuerpo{ display:grid; grid-template-columns:minmax(0,1.3fr) minmax(300px,1fr); gap:var(--s-5); min-height:0; flex:1; }
+.editor-izq{ overflow:auto; padding:2px 8px 12px 2px; min-height:0; animation:revela .35s var(--curva) both; }
+.editor-izq .config-grid-form{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 16px; }
+.editor-hoja label{ display:flex; flex-direction:column; gap:5px; font-weight:700; font-size:13.5px; }
+.editor-hoja .campo-ancho{ grid-column:1 / -1; }
+.editor-izq .metas-mes{ margin-top:var(--s-4); }
+.editor-der{ position:sticky; top:0; align-self:start; padding:var(--s-4); background:#FAF9F4; border:1px solid var(--line-strong); border-top:4px solid var(--gold); border-radius:var(--r-2); }
+.editor-der h3{ font:800 22px/1 var(--display); color:var(--f-900); margin-bottom:var(--s-3); }
+.grafica-metas{ margin:0; } .grafica-metas svg{ width:100%; height:auto; display:block; }
+.grafica-metas figcaption{ display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12.5px; color:var(--ink-2); margin-top:6px; }
+.gm-leyenda{ display:inline-block; width:12px; height:12px; border-radius:2px; margin-right:6px; vertical-align:-1px; } .gm-leyenda.ok{ background:var(--ok); } .gm-leyenda.mal{ background:var(--wine); } .gm-leyenda.meta{ background:var(--gold); border-radius:6px; height:4px; vertical-align:3px; } .gm-leyenda.banda{ background:rgba(201,147,43,.3); }
+.gm-eje{ font:400 11px var(--texto); fill:var(--ink-3); }
+.gm-barra{ transform-origin:bottom; transform-box:fill-box; animation:crece-y .7s var(--curva) both; animation-delay:calc(var(--i) * 45ms); } .gm-barra.ok{ fill:var(--ok); } .gm-barra.mal{ fill:var(--wine); } .gm-barra.sin{ fill:#9AA29D; }
+@keyframes crece-y{ from{ transform:scaleY(0); } }
+.gm-meta{ stroke:var(--gold); stroke-width:2.4; stroke-linejoin:round; stroke-dasharray:1200; animation:dibuja 1.2s var(--curva) .3s both; } @keyframes dibuja{ from{ stroke-dashoffset:1200; } to{ stroke-dashoffset:0; } }
+.gm-punto{ fill:#fff; stroke:var(--gold); stroke-width:2; }
+.gm-banda{ fill:rgba(201,147,43,.22); } .gm-maxima{ stroke:var(--gold-ink); stroke-width:1.5; stroke-dasharray:5 4; }
+.editor-resumen{ margin-top:var(--s-3); padding:10px 12px; background:#fff; border-left:5px solid var(--line-strong); border-radius:var(--r-1); font-size:14px; }
+.editor-resumen.ok{ border-left-color:var(--ok); background:#F1F9F4; }
+.editor-aviso{ margin-top:8px; font-size:13px; color:var(--gold-ink); font-weight:700; }
+.editor-pie{ justify-content:space-between; border-top:1px solid var(--line-strong); padding-top:var(--s-3); }
+.tabla-excel-edit{ min-width:820px; } .tabla-excel-edit td{ padding:4px 3px; min-width:62px; } .tabla-excel-edit input{ width:100%; min-height:36px; padding:4px 6px; text-align:center; border-width:1.5px; font-variant-numeric:tabular-nums; }
+@media (max-width:900px){ .editor-cuerpo{ grid-template-columns:1fr; } .editor-der{ position:static; order:-1; } .editor-izq .config-grid-form{ grid-template-columns:1fr; } .editor-hoja{ max-height:none; } }
+@media (prefers-reduced-motion:reduce){ .gm-barra, .gm-meta, .editor-izq{ animation:none; } }
+.entrada-anim-campo{ height:36%; }
+.entrada-anim-centro{ margin-top:-16vh; }

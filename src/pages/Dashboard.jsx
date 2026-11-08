@@ -304,7 +304,7 @@ export default function Dashboard() {
     <div className="page">
       <div className="membrete-impresion" aria-hidden="true">
         <img src="/logo.png" alt="" height="54" />
-        <div><strong>Indicadores de Gestión · Dashboard {anio}</strong><span>{nombreProceso}, de {MESES[(d?.desde ?? desde) - 1].toLowerCase()} a {MESES[(d?.hasta ?? hasta) - 1].toLowerCase()}. Generado el {new Intl.DateTimeFormat('es-CO', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())}.</span></div>
+        <div><strong>Sistema de Gestión · Dashboard {anio}</strong><span>{nombreProceso}, de {MESES[(d?.desde ?? desde) - 1].toLowerCase()} a {MESES[(d?.hasta ?? hasta) - 1].toLowerCase()}. Generado el {new Intl.DateTimeFormat('es-CO', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())}.</span></div>
       </div>
       <PageHeader
         migas={[{ texto: 'Administración' }, { texto: 'Dashboard' }]}

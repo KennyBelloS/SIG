@@ -3,7 +3,7 @@ import Dialogo from './Dialogo';
 import { cambiarMiNombre } from '../lib/usuarios';
 import { avisar } from '../lib/toast';
 
-/** Cada persona elige cómo quiere que la llamen en la aplicación (se ve en el menú y en la auditoría). */
+/** Cada persona elige cómo quiere que la llamen en la aplicación (se ve en el menú y en la bitácora). */
 export default function CambiarNombre({ actual, email, onCerrar }) {
   const [nombre, setNombre] = useState(actual || '');
   const [error, setError] = useState(null);

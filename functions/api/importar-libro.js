@@ -74,7 +74,7 @@ const CAMPOS_CATALOGO = {
     const a = texto(v.a, 60), b = texto(v.b, 60);
     return a === undefined || b === undefined || !a || !b ? undefined : { a, b };
   },
-  meta_anual: num, meta_mensual: num,
+  meta_anual: num, meta_mensual: num, meta_maxima: num,
   tipo_meta: v => (v == null ? null : (['anual', 'mensual'].includes(v) ? v : undefined)),
   sentido_meta: v => (v == null ? null : (['mayor_mejor', 'menor_mejor'].includes(v) ? v : undefined)),
   metas_mensuales: v => {

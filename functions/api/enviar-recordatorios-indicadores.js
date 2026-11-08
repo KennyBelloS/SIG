@@ -9,9 +9,9 @@
 //   POST (desde la app, sesión iniciada):
 //        { accion: 'recordatorio' | 'dos_dias' | 'cierre' | 'libre', procesoId?, titulo?, mensaje?, destinatarios? }
 //   GET  ?secret=CRON_SECRET  (programador externo, una vez al día):
-//        día 2  -> recordatorio del mes anterior
+//        día 2  -> recordatorio del mes en curso
 //        día (cierre - 2) -> aviso "quedan 2 días"
-//        día 16 (después del 15) -> cierra el mes anterior y avisa
+//        día 16 (después del 15) -> cierra el mes en curso y avisa
 //
 // Variables de entorno en Cloudflare Pages:
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, CORREO_REMITENTE,
@@ -31,10 +31,10 @@ function ahoraColombia(base = new Date()) {
   return { anio, mes, dia, iso: `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}` };
 }
 
-/** El "mes de reporte" es el mes anterior al actual (el que ya debería estar lleno). */
+/** El "mes de reporte" es el mes EN CURSO: se registra durante el mes y se cierra después del día 15 de ese mismo mes. */
 function mesReporteActual(fecha = new Date()) {
   const h = ahoraColombia(fecha);
-  return h.mes === 1 ? { anioReporte: h.anio - 1, mesReporte: 12 } : { anioReporte: h.anio, mesReporte: h.mes - 1 };
+  return { anioReporte: h.anio, mesReporte: h.mes };
 }
 
 /** Misma regla de metas que usa la aplicación: la "que rige" es la anual o la mensual. */
@@ -327,7 +327,7 @@ export async function onRequestPost({ request, env }) {
     const [cfg] = await db.get('indicadores_configuracion?id=eq.1&select=*');
     const activos = await resolverActivos(db, env);
     // Si la app manda un mes concreto (el que la persona está viendo) se usa ese;
-    // si no, el mes anterior al actual.
+    // si no, el mes en curso.
     const porDefecto = mesReporteActual();
     const mesReporte = Number(body.mes) >= 1 && Number(body.mes) <= 12 ? Number(body.mes) : porDefecto.mesReporte;
     const anioReporte = Number(body.anio) || porDefecto.anioReporte;
@@ -414,7 +414,7 @@ export async function onRequestGet({ request, env }) {
     // Latido: queda anotado que el despertador llamó, así el administrador ve que funciona.
     try { await db.patch('indicadores_configuracion?id=eq.1', { ultimo_pulso: new Date().toISOString() }); } catch { /* si la columna aún no existe, no pasa nada */ }
 
-    // Recordatorio del mes anterior (día 2 por defecto) a TODOS los procesos, con pendientes o sin ellos.
+    // Recordatorio del mes en curso (día 2 por defecto) a TODOS los procesos, con pendientes o sin ellos.
     // Si el despertador falló ese día, se recupera en los días siguientes, una sola vez al mes.
     if (dia >= cfg.dia_envio && dia < diaAviso && !yaEnviado(cfg.ultimo_envio_auto)) {
       salida.recordatorio = await recorrerProcesos(db, env, { ...comun, tipo: 'recordatorio', forzar: true });

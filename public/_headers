@@ -1,0 +1,10 @@
+# La aplicación consulta /version.json para saber si hay una versión nueva: nunca debe quedar guardado.
+/version.json
+  Cache-Control: no-store
+# El documento principal siempre se revalida; los archivos con nombre único (/assets) se guardan para siempre.
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
