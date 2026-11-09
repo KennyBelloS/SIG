@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import CartaDesplegable from '../components/vida/CartaDesplegable';
+import TourDispositivo from '../components/vida/TourDispositivo';
 import { useSesion } from '../lib/useSesion';
 import { useMovil } from '../lib/movil';
 import { getResumenMes, mesReporteActual, traducirError, MESES } from '../lib/indicadores';
@@ -15,9 +17,10 @@ export default function InicioMovil() {
   const [d, setD] = useState(null);
   const [error, setError] = useState(null);
   const [abierto, setAbierto] = useState(null);
+  const [carta, setCarta] = useState(null);
+  const navegar = useNavigate();
   const { anio, mesActual } = mesReporteActual();
   useEffect(() => { getResumenMes(anio, mesActual).then(setD).catch(e => setError(traducirError(e))); }, [anio, mesActual]);
-  if (!movil) return <Navigate to="/" replace />;
 
   const hoy = new Date();
   const restan = d ? d.diaCierre - hoy.getDate() : null;
@@ -59,6 +62,11 @@ export default function InicioMovil() {
             </article>
           </section>
 
+          <section className="inicio-demo" aria-labelledby="im-asi">
+            <div className="im-seccion-cab"><h2 className="im-titulo" id="im-asi">Así funciona</h2><button type="button" className="btn-texto" onClick={() => window.dispatchEvent(new Event('indicadores:tour'))}><i className="fa-solid fa-expand" aria-hidden="true"></i> Verlo en pantalla completa</button></div>
+            <TourDispositivo rol={sesion?.rol || 'usuario'} compacto />
+          </section>
+
           <h2 className="im-titulo">Tus procesos</h2>
           {d.porProceso.length === 0 && <div className="estado-vacio"><i className="fa-solid fa-seedling" aria-hidden="true"></i><h3>Todavía no hay indicadores</h3><p>Cuando un administrador los cree, aparecerán aquí.</p></div>}
           <div className="im-mosaico">
@@ -75,7 +83,7 @@ export default function InicioMovil() {
                   </button>
                   {on && (
                     <ul className="im-lista">
-                      {p.items.map(it => <li key={it.id}><Link to={`/indicadores/${it.id}`}><i className={`im-punto e-${it.estado}`} aria-hidden="true" /><span>{it.nombre}</span><small>{{ cumple: 'Cumple', no: 'No cumple', pendiente: 'Por registrar', sinmeta: 'Sin meta' }[it.estado]}</small></Link></li>)}
+                      {p.items.map(it => <li key={it.id}><button type="button" className="im-item" aria-haspopup="dialog" onClick={e => setCarta({ it, proceso: p.nombre, ancla: e.currentTarget })}><i className={`im-punto e-${it.estado}`} aria-hidden="true" /><span>{it.nombre}</span><small>{{ cumple: 'Cumple', no: 'No cumple', pendiente: 'Por registrar', sinmeta: 'Sin meta' }[it.estado]}</small></button></li>)}
                     </ul>
                   )}
                 </article>
@@ -83,6 +91,23 @@ export default function InicioMovil() {
             })}
           </div>
         </>
+      )}
+      {carta && (
+        <CartaDesplegable ancla={carta.ancla} alinear="centro" ancho={340} titulo={`Vista previa: ${carta.it.nombre}`} onCerrar={() => setCarta(null)}>
+          {({ cerrar }) => {
+            const e = carta.it.estado;
+            const texto = { cumple: 'Cumple su meta este mes.', no: carta.it.sinPlan ? 'No cumple y todavía no tiene plan de acción.' : 'No cumple su meta: revisa su plan de acción.', pendiente: sesion?.puedeRegistrar ? 'Falta registrarlo este mes. Abre la ficha y toca el mes.' : 'Todavía no tiene dato este mes.', sinmeta: 'Tiene dato, pero no tiene una meta definida.' }[e];
+            return (
+              <div className="carta-prev">
+                <small>{carta.proceso}</small>
+                <h3>{carta.it.nombre}</h3>
+                <span className={`carta-prev-estado e-${e}`}><i className={`im-punto e-${e}`} aria-hidden="true" /> {{ cumple: 'Cumple', no: 'No cumple', pendiente: 'Por registrar', sinmeta: 'Sin meta' }[e]}</span>
+                <p>{texto}</p>
+                <button type="button" className="btn-primary" onClick={() => { cerrar(); navegar(`/indicadores/${carta.it.id}`); }}>Abrir la ficha <i className="fa-solid fa-arrow-right-long" aria-hidden="true"></i></button>
+              </div>
+            );
+          }}
+        </CartaDesplegable>
       )}
     </div>
   );

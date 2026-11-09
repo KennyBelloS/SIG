@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Chart from 'react-apexcharts';
 import PageHeader from '../components/PageHeader';
+import ResumenVivo from '../components/vida/ResumenVivo';
 import { traducirError } from '../lib/indicadores';
 import {
   getDashboard, getProcesos, getConfiguracionNotificaciones, mesReporteActual, exportarExcel, MESES, MESES_CORTO,
@@ -300,6 +301,21 @@ export default function Dashboard() {
     });
   }
 
+  const resumenItems = useMemo(() => {
+    if (!d) return [];
+    const pr = (d.porProceso || []).filter(f => f.pctCumple != null);
+    const mejor = [...pr].sort((a, b) => b.pctCumple - a.pctCumple)[0], peor = [...pr].sort((a, b) => a.pctCumple - b.pctCumple)[0];
+    const tono = p => (p == null ? 'info' : p >= 85 ? 'bien' : p >= 60 ? 'aten' : 'mal');
+    const out = [];
+    if (d.pctGlobal != null) out.push({ id: 'cumple', icono: 'fa-bullseye', titulo: 'Cumplimiento', valor: `${d.pctGlobal}%`, texto: 'de lo evaluado cumple su meta', tono: tono(d.pctGlobal) });
+    if (mejor) out.push({ id: 'mejor', icono: 'fa-trophy', titulo: 'Mejor proceso', valor: mejor.label, texto: `${mejor.pctCumple}% de cumplimiento`, tono: tono(mejor.pctCumple) });
+    if (peor && peor !== mejor) out.push({ id: 'peor', icono: 'fa-triangle-exclamation', titulo: 'Pide atención', valor: peor.label, texto: `${peor.pctCumple}% de cumplimiento`, tono: tono(peor.pctCumple) });
+    out.push({ id: 'dilig', icono: 'fa-clipboard-check', titulo: 'Diligenciamiento', valor: d.pctDiligencia == null ? '—' : `${d.pctDiligencia}%`, texto: `${d.faltantes} ${d.faltantes === 1 ? 'mes vencido sin dato' : 'meses vencidos sin dato'}`, tono: d.faltantes ? 'aten' : 'bien' });
+    out.push({ id: 'plan', icono: 'fa-list-check', titulo: 'Sin plan de acción', valor: d.sinPlan, texto: d.sinPlan ? 'incumplen y no tienen acción' : 'todo con plan definido', tono: d.sinPlan ? 'mal' : 'bien' });
+    if (variacion) { const dif = variacion.actual - variacion.previo; out.push({ id: 'var', icono: dif >= 0 ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down', titulo: `Frente a ${variacion.mesNombre.toLowerCase()}`, valor: `${dif > 0 ? '+' : ''}${dif} pts`, texto: 'cambio del cumplimiento', tono: dif >= 0 ? 'bien' : 'mal' }); }
+    return out;
+  }, [d, variacion]);
+
   return (
     <div className="page">
       <div className="membrete-impresion" aria-hidden="true">
@@ -357,6 +373,7 @@ export default function Dashboard() {
         </div>
       ) : d && (
         <div className={cargando ? 'recalculando' : ''}>
+          <ResumenVivo items={resumenItems} />
           <section className="panel">
             <div className="panel-header">
               <div><h2>Mapa del año</h2>

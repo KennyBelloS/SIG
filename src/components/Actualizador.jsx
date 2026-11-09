@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Dialogo from './Dialogo';
 import { VERSION, NOVEDADES } from '../lib/versiones';
+import { agregarAviso } from '../lib/avisos';
 
 const CLAVE_ULTIMA = 'tm:ultima-version';
 const espera = () => Number(window.__TM_ACTUALIZAR_SEGUNDOS) || 20;
@@ -26,7 +27,7 @@ export default function Actualizador({ conSesion }) {
         const r = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' });
         if (!r.ok) return;
         const j = await r.json();
-        if (vivo && j && j.id && j.id !== VERSION) { detectada.current = j.id; setNueva(j.id); setSegundos(espera()); }
+        if (vivo && j && j.id && j.id !== VERSION) { detectada.current = j.id; setNueva(j.id); setSegundos(espera()); agregarAviso({ id: `version-${j.id}`, tono: 'info', icono: 'fa-arrows-rotate', titulo: 'Hay una versión nueva del sistema', detalle: 'Se actualizará sola en unos segundos.', accion: 'actualizar' }); }
       } catch { /* sin conexión o una respuesta que no es JSON (en desarrollo): se ignora */ }
     };
     const alVolver = () => { if (!document.hidden) revisar(); };

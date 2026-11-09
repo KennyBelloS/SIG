@@ -1,17 +1,20 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { ROLES } from '../../lib/indicadores';
+import { ROLES, getResumenMes, mesReporteActual, MESES } from '../../lib/indicadores';
+import { supabase } from '../../lib/supabaseClient';
 import { cerrarSesion } from '../../lib/useSesion';
+import InterruptorTema from '../vida/InterruptorTema';
 
 /* Las piezas del teléfono: barra superior, búsqueda flotante, pestañas de abajo y las hojas que suben desde abajo. */
 
-export function MovilBarra({ sesion, onCuenta, onCrear, fabRef }) {
+export function MovilBarra({ sesion, onCuenta, onCrear, fabRef, campana }) {
   const inicial = (sesion?.nombreVisible || sesion?.email || '?').trim()[0]?.toUpperCase();
   return (
     <header className="mv-barra">
       <Link to="/inicio" className="logo-ficha mv-logo" aria-label="Falcon Farms, Finca Torremolinos: ir al inicio"><img src="/logo-icon.png" alt="" /></Link>
       <p className="mv-marca" aria-label="Sistema de gestión"><b>sistema</b> <i>de gestión</i></p>
       <div className="mv-acciones">
+        {campana}
         <button type="button" className="mv-avatar" onClick={onCuenta} aria-label={`Mi cuenta: ${sesion?.nombreVisible || sesion?.email || ''}`} aria-haspopup="dialog"><span aria-hidden="true">{inicial}</span></button>
         <button type="button" className="mv-fab" ref={fabRef} onClick={onCrear} aria-label="¿Qué quieres hacer hoy?" aria-haspopup="dialog"><i className="fa-solid fa-plus" aria-hidden="true"></i></button>
       </div>
@@ -61,27 +64,50 @@ export function HojaInferior({ titulo, onCerrar, children }) {
   );
 }
 
-const DESCRIPCION = {
-  '/dashboard': 'El año entero de un vistazo', '/informe': 'El resultado de cada indicador, en PDF', '/importar': 'Carga varios resultados de una vez',
-  '/novedades': 'Lo que necesita tu atención', '/configuracion': 'Indicadores, cierres y usuarios', '/bitacora': 'Quién cambió qué y cuánto espacio queda', '/ayuda': 'Guías, preguntas y pruebas',
-};
-
-export function HojaMas({ grupos, onCerrar, navegar }) {
+/** «Más»: el resto de los módulos, agrupados y con su estado EN VIVO (no una lista muda): cumplimiento, pendientes, cambios de hoy... */
+export function HojaMas({ grupos, onCerrar, navegar, sesion }) {
+  const { anio, mesActual } = mesReporteActual();
+  const [r, setR] = useState(null);
+  const [cambiosHoy, setCambiosHoy] = useState(null);
+  useEffect(() => {
+    getResumenMes(anio, mesActual).then(setR).catch(() => { /* sin datos: se muestran las descripciones fijas */ });
+    if (sesion?.esAdmin) {
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+      supabase.from('indicadores_auditoria').select('id', { count: 'exact', head: true }).gte('creado_en', hoy.toISOString()).then(({ count }) => setCambiosHoy(count)).catch(() => {});
+    }
+  }, [anio, mesActual, sesion?.esAdmin]);
+  const t = r?.totales, evaluados = t ? t.cumplen + t.noCumplen : 0;
+  const detalle = {
+    '/dashboard': evaluados ? `${Math.round((t.cumplen / evaluados) * 100)}% de lo registrado cumple su meta` : 'El año entero de un vistazo',
+    '/informe': `${MESES[mesActual - 1]} ${anio}: descárgalo en PDF`,
+    '/importar': 'Carga varios resultados desde un Excel',
+    '/novedades': t ? `${t.sinPlan} sin plan de acción · ${t.pendientes} por registrar` : 'Lo que necesita tu atención',
+    '/configuracion': t ? `${t.indicadores} indicadores en ${r.porProceso.length} procesos` : 'Indicadores, cierres y usuarios',
+    '/bitacora': cambiosHoy == null ? 'Quién cambió qué y cuánto espacio queda' : `${cambiosHoy} ${cambiosHoy === 1 ? 'cambio' : 'cambios'} hoy`,
+    '/ayuda': 'Recorrido animado y preguntas frecuentes',
+  };
+  const insignia = { '/novedades': t?.sinPlan || 0, '/importar': 0 };
   const fuera = new Set(['/inicio', '/indicadores', '/matriz']);
-  const items = grupos.flatMap(g => g.items).filter(i => !fuera.has(i.to));
+  const lista = grupos.map(g => ({ ...g, items: g.items.filter(i => !fuera.has(i.to)) })).filter(g => g.items.length);
   return (
     <HojaInferior titulo="Más" onCerrar={onCerrar}>
-      <ul className="hoja-lista">
-        {items.map(i => (
-          <li key={i.to}>
-            <button type="button" onClick={() => { onCerrar(); navegar(i.to); }}>
-              <span className="hoja-ico"><i className={`fa-solid ${i.icono}`} aria-hidden="true"></i></span>
-              <span><strong>{i.texto}</strong><small>{DESCRIPCION[i.to] || ''}</small></span>
-              <i className="fa-solid fa-chevron-right hoja-flecha" aria-hidden="true"></i>
-            </button>
-          </li>
-        ))}
-      </ul>
+      {lista.map(g => (
+        <section key={g.titulo} className="hoja-grupo">
+          <h3>{g.titulo}</h3>
+          <ul className="hoja-lista">
+            {g.items.map(i => (
+              <li key={i.to}>
+                <button type="button" onClick={() => { onCerrar(); navegar(i.to); }}>
+                  <span className="hoja-ico"><i className={`fa-solid ${i.icono}`} aria-hidden="true"></i></span>
+                  <span><strong>{i.texto}</strong><small>{detalle[i.to] || ''}</small></span>
+                  {insignia[i.to] > 0 && <b className="hoja-insignia" aria-label={`${insignia[i.to]} por atender`}>{insignia[i.to]}</b>}
+                  <i className="fa-solid fa-chevron-right hoja-flecha" aria-hidden="true"></i>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </HojaInferior>
   );
 }
@@ -96,6 +122,7 @@ export function HojaCuenta({ sesion, onCerrar, onNombre, onClave, onInstalar }) 
         <li><button type="button" onClick={accion(onNombre)}><span className="hoja-ico"><i className="fa-solid fa-id-badge" aria-hidden="true"></i></span><span><strong>Cambiar mi nombre</strong><small>Cómo quieres que te llamen</small></span></button></li>
         <li><button type="button" onClick={accion(onClave)}><span className="hoja-ico"><i className="fa-solid fa-key" aria-hidden="true"></i></span><span><strong>Cambiar mi contraseña</strong><small>Mínimo 8 caracteres</small></span></button></li>
         <li><button type="button" onClick={accion(onInstalar)}><span className="hoja-ico"><i className="fa-solid fa-mobile-screen-button" aria-hidden="true"></i></span><span><strong>Instalar en mi celular</strong><small>Ábrelo como una aplicación, desde la pantalla de inicio</small></span></button></li>
+        <li className="hoja-tema"><span><strong>Modo oscuro</strong><small>Desliza la perilla por la ranura</small></span><InterruptorTema /></li>
         <li><button type="button" className="peligro" onClick={cerrarSesion}><span className="hoja-ico"><i className="fa-solid fa-right-from-bracket" aria-hidden="true"></i></span><span><strong>Cerrar sesión</strong></span></button></li>
       </ul>
     </HojaInferior>

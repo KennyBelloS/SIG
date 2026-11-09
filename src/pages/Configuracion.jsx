@@ -14,6 +14,7 @@ import {
   mesReporteActual, MESES, MESES_CORTO, formatearMeta, esPorcentaje, entradaAValor, valorAEntrada,
 } from '../lib/indicadores';
 import FormularioIndicador from '../components/EditorIndicador';
+import Laboratorio from '../components/vida/Laboratorio';
 
 const { anio: ANIO_ACTUAL } = mesReporteActual();
 
@@ -29,6 +30,7 @@ const PESTANAS = [
   { id: 'cierres', label: 'Cierres mensuales', icono: 'fa-lock' },
   { id: 'notificaciones', label: 'Notificaciones', icono: 'fa-bell' },
   { id: 'usuarios', label: 'Usuarios', icono: 'fa-users-gear' },
+  { id: 'animaciones', label: 'Animaciones', icono: 'fa-wand-magic-sparkles' },
 ];
 
 
@@ -727,6 +729,7 @@ export default function Configuracion() {
       {tab === 'cierres' && <PestanaCierres />}
       {tab === 'notificaciones' && <PestanaNotificaciones />}
       {tab === 'usuarios' && <PestanaUsuarios />}
+      {tab === 'animaciones' && <Laboratorio />}
     </div>
   );
 }

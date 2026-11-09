@@ -23,9 +23,8 @@ function SoloAdmin({ sesion, children }) {
 }
 
 /** La raíz lleva a cada persona a su primer módulo: el administrador al Dashboard, los demás a la Matriz. */
-function Inicio({ sesion }) {
-  const movil = useMovil();   // en el teléfono la raíz es la pantalla de inicio de tarjetas
-  return <Navigate to={movil ? '/inicio' : sesion?.esAdmin ? '/dashboard' : '/matriz'} replace />;
+function Inicio() {
+  return <Navigate to="/inicio" replace />;   // la raíz es el Inicio (tarjetas, recorrido animado y resumen), en teléfono y en computador
 }
 
 /** Digitadores y administradores: quienes registran datos. */

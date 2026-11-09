@@ -14,6 +14,8 @@ import { MovilBarra, MovilBuscar, MovilTabs, HojaMas, HojaCuenta } from './movil
 import CrearOverlay from './movil/CrearOverlay';
 import HojaIndicadores from './movil/HojaIndicadores';
 import InstalarSheet from './movil/InstalarSheet';
+import Campana from './vida/Campana';
+import InterruptorTema from './vida/InterruptorTema';
 
 /* Orden de los módulos: Dashboard, Matriz, Indicadores, Informe mensual; luego los de datos y administración,
    y "Cómo se usa" siempre al final. */
@@ -21,6 +23,7 @@ const GRUPOS = (sesion) => [
   {
     titulo: 'Seguimiento',
     items: [
+      { to: '/inicio', icono: 'fa-house', texto: 'Inicio' },
       ...(sesion?.esAdmin ? [{ to: '/dashboard', icono: 'fa-chart-pie', texto: 'Dashboard' }] : []),
       { to: '/matriz', icono: 'fa-table-cells', texto: 'Matriz' },
       { to: '/indicadores', icono: 'fa-chart-simple', texto: 'Indicadores' },
@@ -69,6 +72,7 @@ function MenuUsuario({ sesion, onClave, onNombre }) {
         <div className="mast-menu" role="menu">
           <button role="menuitem" onClick={() => { setAbierto(false); onNombre(); }}><i className="fa-solid fa-id-badge" aria-hidden="true"></i> Cambiar mi nombre</button>
           <button role="menuitem" onClick={() => { setAbierto(false); onClave(); }}><i className="fa-solid fa-key" aria-hidden="true"></i> Cambiar mi contraseña</button>
+          <div className="mast-menu-tema" role="presentation"><span>Modo oscuro</span><InterruptorTema /></div>
           <button role="menuitem" onClick={cerrarSesion}><i className="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Cerrar sesión</button>
         </div>
       )}
@@ -93,6 +97,7 @@ export default function Layout() {
   const [marcador, setMarcador] = useState(null);
   const [progreso, setProgreso] = useState(0);
   const movil = useMovil();
+  const variante = ['onda', 'sube', 'zoom', 'giro'][Math.max(0, ['inicio', 'dashboard', 'matriz', 'indicadores', 'informe', 'importar', 'novedades', 'configuracion', 'bitacora', 'ayuda'].indexOf(pathname.split('/')[1])) % 4];
   const navegar = useNavigate();
   const [hoja, setHoja] = useState(null);          // 'mas' | 'cuenta' | null
   const [crear, setCrear] = useState(null);        // { x, y } del botón rojo, o null
@@ -113,14 +118,21 @@ export default function Layout() {
 
   // el marcador dorado se desliza hasta la sección activa
   useLayoutEffect(() => {
+    const nav = navRef.current;
     const medir = () => {
-      const activo = navRef.current?.querySelector('.mast-enlace.activo');
-      setMarcador(activo ? { x: activo.offsetLeft, w: activo.offsetWidth } : null);
+      const activo = nav?.querySelector('.mast-enlace.activo');
+      if (!activo || !nav) { setMarcador(null); return; }
+      // posición real respecto de la barra (no del offsetParent): se corrige sola cuando cambia el ancho de los textos
+      const x = activo.getBoundingClientRect().left - nav.getBoundingClientRect().left - nav.clientLeft + nav.scrollLeft;
+      setMarcador({ x, w: activo.offsetWidth });
     };
     medir();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(medir) : null;
+    if (ro && nav) { ro.observe(nav); nav.querySelectorAll('.mast-enlace').forEach(l => ro.observe(l)); }
     window.addEventListener('resize', medir);
     document.fonts?.ready?.then(medir);
-    return () => window.removeEventListener('resize', medir);
+    document.fonts?.addEventListener?.('loadingdone', medir);
+    return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', medir); document.fonts?.removeEventListener?.('loadingdone', medir); };
   }, [pathname, sesion?.rol]);
 
   // al cambiar de pantalla, una línea recorre la franja: la persona ve que algo está pasando
@@ -150,17 +162,17 @@ export default function Layout() {
     return (
       <div className="app movil-app">
         <a className="saltar" href="#contenido">Saltar al contenido</a>
-        <MovilBarra sesion={sesion} fabRef={fabRef} onCuenta={() => setHoja('cuenta')} onCrear={abrirCrear} />
+        <MovilBarra sesion={sesion} fabRef={fabRef} onCuenta={() => setHoja('cuenta')} onCrear={abrirCrear} campana={<Campana sesion={sesion} />} />
         {sesion?.rolNoLeido && (
           <div className="aviso-rol" role="alert"><i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong>No pude leer tu rol, por eso ves solo lo básico.</strong> Tus permisos no se perdieron. Recarga la página; si sigue igual, falta ejecutar la actualización de la base de datos.</div><button type="button" className="btn-secondary btn-chico" onClick={() => window.location.reload()}>Recargar</button></div>
         )}
         <FranjaPlazo />
-        <main id="contenido" className="contenido" tabIndex={-1} key={pathname.split('/').slice(0, 2).join('/')}><Outlet /></main>
+        <main id="contenido" className="contenido" data-trans={variante} tabIndex={-1} key={pathname.split('/').slice(0, 2).join('/')}><Outlet /></main>
         <MovilBuscar onBuscar={() => setPaleta(true)} />
         <MovilTabs onMas={() => setHoja('mas')} masActivo={rutasDeMas} />
         <BienvenidaTour />
         <Toaster />
-        {hoja === 'mas' && <HojaMas grupos={grupos} navegar={navegar} onCerrar={() => setHoja(null)} />}
+        {hoja === 'mas' && <HojaMas grupos={grupos} navegar={navegar} sesion={sesion} onCerrar={() => setHoja(null)} />}
         {hoja === 'cuenta' && <HojaCuenta sesion={sesion} onCerrar={() => setHoja(null)} onNombre={() => setCambiandoNombre(true)} onClave={() => setCambiandoClave(true)} onInstalar={() => window.dispatchEvent(new Event('tm:instalar'))} />}
         {crear && <CrearOverlay origen={crear} sesion={sesion} navegar={navegar} onHoja={setHoja} onCerrar={() => setCrear(null)} />}
         {(hoja === 'pendientes' || hoja === 'nocumplen') && <HojaIndicadores modo={hoja} navegar={navegar} onCerrar={() => setHoja(null)} />}
@@ -182,13 +194,14 @@ export default function Layout() {
             <span className="mast-marcador" aria-hidden="true" style={marcador ? { transform: `translateX(${marcador.x}px)`, width: marcador.w, opacity: 1 } : { opacity: 0 }} />
             {grupos.map((g, gi) => (
               <div className="mast-grupo" key={g.titulo} role="group" aria-label={g.titulo} style={{ '--g': gi }}>
-                {g.items.map(i => <NavLink key={i.to} to={i.to} end={i.exacto} className={clase}>{i.texto}</NavLink>)}
+                {g.items.map(i => <NavLink key={i.to} to={i.to} end={i.exacto} className={clase}><i className={`fa-solid ${i.icono}`} aria-hidden="true"></i><span className="t-largo">{i.texto}</span>{i.corto && <span className="t-corto" aria-hidden="true">{i.corto}</span>}</NavLink>)}
               </div>
             ))}
           </nav>
           <button type="button" className="mast-buscar" onClick={() => setPaleta(true)}>
             <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span>Buscar</span><kbd>Ctrl K</kbd>
           </button>
+          <Campana sesion={sesion} />
           <button type="button" className="mast-crear" ref={fabRef} onClick={abrirCrear} aria-label="¿Qué quieres hacer hoy?" aria-haspopup="dialog"><i className="fa-solid fa-plus" aria-hidden="true"></i></button>
           <MenuUsuario sesion={sesion} onClave={() => setCambiandoClave(true)} onNombre={() => setCambiandoNombre(true)} />
         </div>
@@ -199,7 +212,7 @@ export default function Layout() {
       )}
       <FranjaPlazo />
 
-      <main id="contenido" className="contenido" tabIndex={-1} key={pathname.split('/').slice(0, 2).join('/')}><Outlet /></main>
+      <main id="contenido" className="contenido" data-trans={variante} tabIndex={-1} key={pathname.split('/').slice(0, 2).join('/')}><Outlet /></main>
       <BienvenidaTour />
       <Toaster />
       {cambiandoClave && <CambiarClave onCerrar={() => setCambiandoClave(false)} />}
