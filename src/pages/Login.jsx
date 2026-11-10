@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { traducirError } from '../lib/indicadores';
+import Escribiendo from '../components/vida/Escribiendo';
+import PrevisualizacionApp from '../components/vida/PrevisualizacionApp';
+import { useMovil } from '../lib/movil';
+import { menosMovimiento } from '../lib/preferencias';
 import { iniciarSesion } from '../lib/useSesion';
 
 const CLAVE_CORREO = 'tm:correo-recordado';
@@ -34,6 +38,7 @@ const saludo = () => { const h = new Date().getHours(); return h < 12 ? 'Buenos 
 
 export default function Login() {
   const recordado = useMemo(() => { try { return localStorage.getItem(CLAVE_CORREO) || ''; } catch { return ''; } }, []);
+  const estrecha = useMovil();
   const [email, setEmail] = useState(recordado);
   const [password, setPassword] = useState('');
   const [verClave, setVerClave] = useState(false);
@@ -42,79 +47,90 @@ export default function Login() {
   const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [sacudir, setSacudir] = useState(0);
+  const [modo, setModo] = useState('entrar');       // 'entrar' | 'ayuda': se cambia con una cuchilla que cruza la tarjeta
+  const [cuchilla, setCuchilla] = useState(0);
   const claveRef = useRef(null);
-  const marcaRef = useRef(null);
-  const moverRaton = e => { const r = marcaRef.current; if (!r) return; const b = r.getBoundingClientRect(); r.style.setProperty('--mx', ((e.clientX - b.left) / b.width - 0.5) * 2); r.style.setProperty('--my', ((e.clientY - b.top) / b.height - 0.5) * 2); };
   useEffect(() => { if (recordado) claveRef.current?.focus(); }, [recordado]);
 
+  const cambiarModo = m => {
+    if (m === modo) return;
+    if (menosMovimiento()) { setModo(m); return; }
+    setCuchilla(k => k + 1); setTimeout(() => setModo(m), 400);
+  };
   async function enviar(e) {
     e.preventDefault();
     setCargando(true); setError(null);
     try { sessionStorage.setItem('tm:entrando', '1'); } catch { /* sin almacenamiento: no hay animación */ }
     try {
       await iniciarSesion(email, password);
-      try { if (recordar) localStorage.setItem(CLAVE_CORREO, email.trim().toLowerCase()); else localStorage.removeItem(CLAVE_CORREO); } catch { /* sin almacenamiento: no pasa nada */ }
+      try { if (recordar) localStorage.setItem(CLAVE_CORREO, email.trim().toLowerCase()); else localStorage.removeItem(CLAVE_CORREO); } catch { /* nada */ }
     } catch (err) { try { sessionStorage.removeItem('tm:entrando'); } catch { /* nada */ } setError(traducirError(err)); setSacudir(n => n + 1); setPassword(''); setTimeout(() => claveRef.current?.focus(), 0); }
     finally { setCargando(false); }
   }
 
   return (
-    <div className="entrada">
-      <section className="entrada-marca" aria-label="Sobre el sistema" ref={marcaRef} onMouseMove={moverRaton}>
-        <div className="entrada-luz" aria-hidden="true" />
-        <img src="/logo.png" alt="Falcon Farms, Finca Torremolinos" className="entrada-logo" />
-        <h1><span style={{ '--w': 0 }}>Sistema</span> <span style={{ '--w': 1 }}>de</span> <span style={{ '--w': 2 }}>Gestión</span></h1>
-        <p className="entrada-lema">Un solo lugar para llevar la gestión de la finca: cada proceso, cada meta, cada mes.</p>
-        <ul className="entrada-modulos" aria-label="Módulos del sistema">
-          <li className="activo"><i className="fa-solid fa-chart-simple" aria-hidden="true"></i> Indicadores</li>
-          <li className="pronto"><i className="fa-solid fa-plus" aria-hidden="true"></i> Más módulos, pronto</li>
-        </ul>
-        <svg className="entrada-campo" viewBox="0 0 520 300" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
-          <line x1="0" y1="299" x2="520" y2="299" stroke="#3FAE62" strokeOpacity=".5" strokeWidth="2" />
-          {ROSALES.map((r, i) => <Rosal key={i} i={i} {...r} />)}
-        </svg>
-        <div className="entrada-petalos" aria-hidden="true">{Array.from({ length: 9 }, (_, i) => <i key={i} style={{ '--i': i }} />)}</div>
-        <span className="entrada-pie">Falcon Farms · Suesca, Cundinamarca</span>
-      </section>
+    <div className="ent2">
+      <div className="ent2-aurora" aria-hidden="true" />
+      <div className="ent2-tarjeta">
+        <section className="ent2-izq" aria-label="Sobre el sistema">
+          <img src="/logo.png" alt="Falcon Farms, Finca Torremolinos" className="ent2-logo" />
+          <h1><span style={{ '--w': 0 }}>Sistema</span> <span style={{ '--w': 1 }}>de</span> <span style={{ '--w': 2 }}>Gestión</span></h1>
+          <p className="ent2-lema">Cada proceso, cada meta, cada mes, en un solo lugar.</p>
+          <div className="ent2-prev"><PrevisualizacionApp tipo={estrecha ? 'iphone' : 'macbook'} /></div>
+          <span className="ent2-pie">Falcon Farms · Suesca, Cundinamarca</span>
+        </section>
 
-      <section className="entrada-acceso">
-        <form key={sacudir} className={`entrada-form${sacudir ? ' sacude' : ''}`} onSubmit={enviar} noValidate>
-          <header>
-            <p className="entrada-saludo">{saludo()}</p>
-            <h2>Iniciar sesión</h2>
-            <p>Usa el correo que te asignó el administrador.</p>
-          </header>
-
-          <label htmlFor="login-correo">Correo
-            <div className="campo-icono">
-              <i className="fa-regular fa-envelope" aria-hidden="true"></i>
-              <input id="login-correo" type="email" value={email} autoComplete="username" autoFocus={!recordado} required inputMode="email" spellCheck={false}
-                placeholder="nombre@falconfarms.com.co" onChange={e => setEmail(e.target.value)} />
-            </div>
-          </label>
-
-          <label htmlFor="login-clave">Contraseña
-            <div className="campo-icono">
-              <i className="fa-solid fa-lock" aria-hidden="true"></i>
-              <input id="login-clave" ref={claveRef} type={verClave ? 'text' : 'password'} value={password} autoComplete="current-password" required
-                onChange={e => setPassword(e.target.value)} onKeyUp={e => setMayus(!!e.getModifierState && e.getModifierState('CapsLock'))} onBlur={() => setMayus(false)} />
-              <button type="button" className="ver-clave" onClick={() => setVerClave(v => !v)} aria-label={verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
-                <i className={`fa-solid ${verClave ? 'fa-eye-slash' : 'fa-eye'}`} aria-hidden="true"></i>
+        <section className="ent2-der">
+          {modo === 'entrar' ? (
+            <form key={`f${sacudir}`} className={`entrada-form ent2-form${sacudir ? ' sacude' : ''}`} onSubmit={enviar} noValidate>
+              <header>
+                <p className="entrada-saludo">{saludo()}</p>
+                <h2 aria-label="Inicio de sesión"><Escribiendo texto="Inicio de sesión" className="cursiva" /></h2>
+                <p>Usa el correo que te asignó el administrador.</p>
+              </header>
+              <label htmlFor="login-correo">Correo
+                <div className="campo-icono">
+                  <i className="fa-regular fa-envelope" aria-hidden="true"></i>
+                  <input id="login-correo" type="email" value={email} autoComplete="username" autoFocus={!recordado} required inputMode="email" spellCheck={false}
+                    placeholder="nombre@falconfarms.com.co" onChange={e => setEmail(e.target.value)} />
+                </div>
+              </label>
+              <label htmlFor="login-clave">Contraseña
+                <div className="campo-icono">
+                  <i className="fa-solid fa-lock" aria-hidden="true"></i>
+                  <input id="login-clave" ref={claveRef} type={verClave ? 'text' : 'password'} value={password} autoComplete="current-password" required
+                    onChange={e => setPassword(e.target.value)} onKeyUp={e => setMayus(!!e.getModifierState && e.getModifierState('CapsLock'))} onBlur={() => setMayus(false)} />
+                  <button type="button" className="ver-clave" onClick={() => setVerClave(v => !v)} aria-label={verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+                    <i className={`fa-solid ${verClave ? 'fa-eye-slash' : 'fa-eye'}`} aria-hidden="true"></i>
+                  </button>
+                </div>
+                <span className="entrada-mayus" role="status" aria-live="polite">{mayus ? 'Tienes las mayúsculas activadas.' : ''}</span>
+              </label>
+              <label className="entrada-recordar"><input type="checkbox" checked={recordar} onChange={e => setRecordar(e.target.checked)} /> Recordar mi correo en este equipo</label>
+              {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+              <button className="btn-primary entrada-boton" type="submit" disabled={cargando || !email || !password}>
+                {cargando ? <><i className="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Verificando</> : <>Entrar <i className="fa-solid fa-arrow-right-long" aria-hidden="true"></i></>}
               </button>
+              <p className="entrada-ayuda">¿No puedes entrar? <button type="button" className="ent2-enlace" onClick={() => cambiarModo('ayuda')}>Te explico cómo</button></p>
+            </form>
+          ) : (
+            <div className="entrada-form ent2-form ent2-ayuda">
+              <header>
+                <p className="entrada-saludo">Sin problema</p>
+                <h2 aria-label="¿Necesitas ayuda?"><Escribiendo texto="¿Necesitas ayuda?" className="cursiva" /></h2>
+                <p>Las cuentas las crea una persona administradora.</p>
+              </header>
+              <ol className="ent2-pasos">
+                <li><span>1</span><div><strong>Escribe al Analista de Gestión Integral</strong><small>Es quien crea y administra las cuentas.</small></div></li>
+                <li><span>2</span><div><strong>Te llegarán tu correo y una clave</strong><small>Podrás cambiarla en «Preferencias» al entrar.</small></div></li>
+                <li><span>3</span><div><strong>Entra y listo</strong><small>El sistema te muestra cómo funciona la primera vez.</small></div></li>
+              </ol>
+              <button type="button" className="btn-secondary entrada-boton" onClick={() => cambiarModo('entrar')}><i className="fa-solid fa-arrow-left-long" aria-hidden="true"></i> Volver a iniciar sesión</button>
             </div>
-            <span className="entrada-mayus" role="status" aria-live="polite">{mayus ? 'Tienes las mayúsculas activadas.' : ''}</span>
-          </label>
-
-          <label className="entrada-recordar"><input type="checkbox" checked={recordar} onChange={e => setRecordar(e.target.checked)} /> Recordar mi correo en este equipo</label>
-
-          {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
-
-          <button className="btn-primary entrada-boton" type="submit" disabled={cargando || !email || !password}>
-            {cargando ? <><i className="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Verificando</> : <>Entrar <i className="fa-solid fa-arrow-right-long" aria-hidden="true"></i></>}
-          </button>
-          <p className="entrada-ayuda">¿No puedes entrar? Escribe al Analista de Gestión Integral.</p>
-        </form>
-      </section>
+          )}
+        </section>
+        {cuchilla > 0 && <div className="ent2-cuchilla" key={cuchilla} aria-hidden="true" onAnimationEnd={() => setCuchilla(0)} />}
+      </div>
     </div>
   );
 }

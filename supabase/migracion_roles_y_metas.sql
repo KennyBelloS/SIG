@@ -357,3 +357,37 @@ begin
   dia := least(greatest(coalesce(dia, 15), 1), 28);
   return hoy > make_date(p_anio, p_mes, dia);
 end $$;
+
+-- =====================================================================
+-- 17) La actividad (bitácora) se elimina cada mes
+--     Se conserva solo la del mes en curso. El 1.º de cada mes (hora de Colombia) el despertador diario borra la anterior
+--     y deja UNA nota que dice cuántos registros se eliminaron. Solo un administrador (o el despertador) puede ejecutarla.
+-- =====================================================================
+create or replace function public.indicadores_depurar_bitacora()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_corte timestamptz := (date_trunc('month', now() at time zone 'America/Bogota')) at time zone 'America/Bogota';
+  v_desde timestamptz;
+  v_n bigint;
+begin
+  if auth.role() is distinct from 'service_role' and public.rol_actual() is distinct from 'admin' then
+    raise exception 'Solo un administrador puede depurar la bitácora.' using errcode = '42501';
+  end if;
+  select min(creado_en) into v_desde from public.indicadores_auditoria where creado_en < v_corte;
+  delete from public.indicadores_auditoria where creado_en < v_corte;
+  get diagnostics v_n = row_count;
+  if v_n > 0 then
+    insert into public.indicadores_auditoria (tipo, accion, resumen, despues)
+    values ('configuracion', 'depurar',
+            format('Se eliminó la actividad anterior al %s (%s registros)', to_char(v_corte at time zone 'America/Bogota', 'DD/MM/YYYY'), v_n),
+            jsonb_build_object('eliminados', v_n, 'desde', v_desde, 'hasta', v_corte));
+  end if;
+  return jsonb_build_object('eliminados', v_n, 'corte', v_corte);
+end;
+$$;
+revoke all on function public.indicadores_depurar_bitacora() from public;
+grant execute on function public.indicadores_depurar_bitacora() to authenticated, service_role;

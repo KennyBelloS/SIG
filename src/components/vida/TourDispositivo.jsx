@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { menosMovimiento } from '../../lib/preferencias';
 import { Link } from 'react-router-dom';
 import { Dispositivo, Escala } from './Dispositivo';
 import { laminasPara, ROL } from '../ayuda/contenido';
@@ -6,11 +7,11 @@ import { ILUSTRACIONES } from '../ayuda/Ilustraciones';
 import { useMovil } from '../../lib/movil';
 
 const DURACION = 10;
-const menos = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const menos = () => menosMovimiento();
 
 /** El recorrido animado de la aplicación, visto dentro de un iPhone (en el celular) o de una MacBook (en el computador).
  *  Avanza solo, se puede pausar, retroceder y saltar de lámina. Es el mismo contenido de «Cómo se usa». */
-export default function TourDispositivo({ rol = 'admin', dispositivo = 'auto', onIr, onFin, compacto = false }) {
+export default function TourDispositivo({ rol = 'admin', dispositivo = 'auto', onIr, onFin, compacto = false, pantalla = false }) {
   const movil = useMovil();
   const tipo = dispositivo === 'auto' ? (movil ? 'iphone' : 'macbook') : dispositivo;
   const laminas = laminasPara(rol), n = laminas.length;
@@ -27,12 +28,13 @@ export default function TourDispositivo({ rol = 'admin', dispositivo = 'auto', o
   }, [i]);
 
   return (
-    <section className={`tour-disp tour-${tipo}${compacto ? ' compacto' : ''}`} aria-label="Cómo funciona el sistema" aria-roledescription="carrusel">
+    <section className={`tour-disp tour-${tipo}${compacto ? ' compacto' : ''}${pantalla ? ' tour-fit' : ''}`} aria-label="Cómo funciona el sistema" aria-roledescription="carrusel">
       <Dispositivo tipo={tipo} etiqueta={`Recorrido de la aplicación en ${tipo === 'iphone' ? 'un iPhone' : tipo === 'android' ? 'un Android' : 'una MacBook'}`}>
         <div className="td-pantalla" key={l.id}>
           <div className="td-barra"><img src="/logo-icon.png" alt="" /><b>sistema <i>de gestión</i></b><em>{i + 1}/{n}</em></div>
-          <div className="td-ilus" aria-hidden="true"><Escala ancho={tipo === 'macbook' ? 600 : 520}><div className="rec-escena"><div className="ilus"><Ilus /></div></div></Escala></div>
+          <div className="td-ilus" aria-hidden="true"><Escala ancho={tipo === 'macbook' ? 600 : 400}><div className="rec-escena"><div className="ilus"><Ilus /></div></div></Escala></div>
           <p className="td-titulo"><i className={`fa-solid ${l.icono}`} aria-hidden="true"></i> {l.titulo}</p>
+          {tipo !== 'macbook' && <div className="td-cuerpo" tabIndex={0} role="region" aria-label="Detalle de la lámina"><p className="td-resumen">{l.resumen}</p><ol className="td-pasos">{l.pasos.slice(0, 3).map((p, k) => <li key={k}><span>{k + 1}</span>{p}</li>)}</ol></div>}
         </div>
       </Dispositivo>
       <div className="td-texto" aria-live="polite">
@@ -40,7 +42,7 @@ export default function TourDispositivo({ rol = 'admin', dispositivo = 'auto', o
         <h3><i className={`fa-solid ${l.icono}`} aria-hidden="true"></i> {l.titulo}</h3>
         <p className="rec-resumen">{l.resumen}</p>
         {!compacto && <ol className="rec-pasos">{l.pasos.slice(0, 4).map((p, k) => <li key={k}><span>{k + 1}</span>{p}</li>)}</ol>}
-        {l.ruta && (onIr ? <button className="btn-secondary" onClick={() => onIr(l.ruta)}>{l.boton}</button> : <Link className="btn-secondary" to={l.ruta}>{l.boton}</Link>)}
+        {l.ruta && (onIr ? <button className="btn-secondary td-boton" onClick={() => onIr(l.ruta)}>{l.boton}</button> : <Link className="btn-secondary td-boton" to={l.ruta}>{l.boton}</Link>)}
       </div>
       <div className="td-control">
         <button className="btn-texto" onClick={anterior} disabled={i === 0} aria-label="Lámina anterior"><i className="fa-solid fa-chevron-left" aria-hidden="true"></i></button>

@@ -1,3 +1,4 @@
+import { menosMovimiento } from './preferencias';
 /** Modo claro / oscuro. Se guarda la elección; el cambio se revela como un círculo que crece desde el interruptor (View Transitions, si el navegador las tiene). */
 const CLAVE = 'tm:tema';
 const meta = t => { const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'oscuro' ? '#0B1410' : '#F5F4EF'); };
@@ -11,7 +12,7 @@ export function inicializarTema() {
 
 export function aplicarTema(t, origen) {
   const poner = () => { document.documentElement.dataset.tema = t; try { localStorage.setItem(CLAVE, t); } catch { /* nada */ } meta(t); window.dispatchEvent(new Event('tm:tema')); };
-  const menos = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const menos = menosMovimiento();
   if (!document.startViewTransition || menos) { poner(); return; }
   const x = origen?.x ?? window.innerWidth / 2, y = origen?.y ?? window.innerHeight / 2;
   const r = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));

@@ -10,7 +10,9 @@ import './tipografia.css';
 import './vida.css';
 import { inicializarTema } from './lib/tema';
 import { iniciarVida } from './lib/vida';
+import { iniciarPreferencias } from './lib/preferencias';
 
+iniciarPreferencias();
 inicializarTema();
 iniciarVida();
 

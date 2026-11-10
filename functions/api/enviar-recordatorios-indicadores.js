@@ -75,6 +75,11 @@ class Supa {
       body: JSON.stringify(body) });
     if (!r.ok) throw new Error(`Supabase POST ${path}: ${r.status} ${await r.text()}`);
   }
+  async rpc(nombre, args = {}) {
+    const r = await fetch(`${this.url}/rest/v1/rpc/${nombre}`, { method: 'POST', headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
+    if (!r.ok) throw new Error(`${nombre}: ${await r.text()}`);
+    return r.json();
+  }
   async upsert(path, body, onConflict) {
     const r = await fetch(`${this.url}/rest/v1/${path}?on_conflict=${onConflict}`, { method: 'POST',
       headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -396,8 +401,13 @@ export async function onRequestGet({ request, env }) {
     if (!ctx) return json({ error: 'Falta configurar SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.' }, 500);
     const { db, appUrl } = ctx;
 
+    // La actividad (bitácora) se elimina cada mes: del día 1 al 3 se borra la de los meses anteriores (si el despertador falló el 1, se recupera).
+    // Corre aunque los correos estén desactivados.
+    let depuracion = null;
+    if (ahoraColombia().dia <= 3) { try { depuracion = await db.rpc('indicadores_depurar_bitacora'); } catch (e) { depuracion = { error: String(e.message || e).slice(0, 200) }; } }
+
     const [cfg] = await db.get('indicadores_configuracion?id=eq.1&select=*');
-    if (!cfg || !cfg.activo) return json({ ok: true, omitido: 'inactivo' });
+    if (!cfg || !cfg.activo) return json({ ok: true, omitido: 'inactivo', depuracion });
     const activos = await resolverActivos(db, env);
 
     const hoy = ahoraColombia();
@@ -406,7 +416,7 @@ export async function onRequestGet({ request, env }) {
     const diaCierre = cfg.dia_cierre ?? 15;
     const diaAviso = Math.max(1, diaCierre - 2);
     const { anioReporte, mesReporte } = mesReporteActual();
-    const salida = { ok: true, fecha: hoyISO };
+    const salida = { ok: true, fecha: hoyISO, depuracion };
     const comun = { anio: anioReporte, mes: mesReporte, cfg, activos, appUrl, modo: 'automatico' };
     const esteMes = hoyISO.slice(0, 7);
     const yaEnviado = fecha => String(fecha || '').slice(0, 7) === esteMes;

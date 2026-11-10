@@ -90,6 +90,11 @@ function Actividad({ periodo, setPeriodo }) {
   const personas = useMemo(() => [...new Set((datos || []).map(e => e.email).filter(Boolean))].sort(), [datos]);
   const vistos = useMemo(() => (datos || []).filter(e => (persona === 'todas' || e.email === persona) && (!texto.trim() || `${e.resumen} ${e.email} ${e.nombre || ''}`.toLowerCase().includes(texto.trim().toLowerCase()))), [datos, persona, texto]);
 
+  const limpieza = (() => {
+    const NOM = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const hoy = new Date(), faltan = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate() - hoy.getDate() + 1;
+    return { faltan, texto: `La de ${NOM[hoy.getMonth()]} se borrará el 1 de ${NOM[(hoy.getMonth() + 1) % 12]}${faltan <= 5 ? ` (${faltan === 1 ? 'mañana' : `en ${faltan} días`})` : ''}; solo se conserva la del mes en curso. Si la necesitas, descárgala en Excel antes.` };
+  })();
   async function descargar() {
     const { default: escribir } = await import('write-excel-file/browser');
     const cab = ['Fecha', 'Persona', 'Correo', 'Clase', 'Acción', 'Detalle'].map(v => ({ value: v, fontWeight: 'bold' }));
@@ -106,6 +111,11 @@ function Actividad({ periodo, setPeriodo }) {
         <label>Periodo<select value={periodo} onChange={e => setPeriodo(e.target.value)}>{PERIODOS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></label>
         <label className="aud-buscar">Buscar<input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Un indicador, una persona…" /></label>
         <button type="button" className="btn-secondary" onClick={descargar} disabled={!vistos.length}><i className="fa-solid fa-file-excel" aria-hidden="true"></i> Descargar Excel</button>
+      </div>
+      <div className="aud-limpieza" role="note">
+        <i className="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+        <div><strong>La actividad se elimina cada mes.</strong> <span>{limpieza.texto}</span></div>
+        <button type="button" className="btn-secondary" onClick={descargar} disabled={!vistos.length}><i className="fa-solid fa-file-excel" aria-hidden="true"></i> Descargar antes</button>
       </div>
       {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
       <section className="panel" aria-labelledby="aud-titulo">

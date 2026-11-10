@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { menosMovimiento } from '../../lib/preferencias';
 import { Dispositivo } from './Dispositivo';
 import InterruptorTema from './InterruptorTema';
 import ResumenVivo from './ResumenVivo';
+import CartaTres from './CartaTres';
+import Preferencias from './Preferencias';
 import { volar } from './volar';
 import { agregarAviso, origenVuelo, NOMBRE_PLATAFORMA } from '../../lib/avisos';
 
@@ -13,7 +16,7 @@ const EJEMPLO = [
   { id: 'c', icono: 'fa-triangle-exclamation', titulo: 'Pide atención', valor: 'Seguridad', texto: '20% de cumplimiento', tono: 'mal' },
   { id: 'd', icono: 'fa-hourglass-half', titulo: 'Plazo', valor: '7 días', texto: 'para registrar este mes', tono: 'aten' },
 ];
-const menos = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const menos = () => menosMovimiento();
 
 /** Un banco de pruebas de todo lo que se mueve: cada efecto se ve dentro de un iPhone, un Android o una MacBook, y se puede lanzar
  *  también «de verdad» en la pantalla real. Es el lugar para probar antes de llevar estas animaciones a otra aplicación. */
@@ -63,7 +66,7 @@ export default function Laboratorio() {
                 : (<><h4>Indicadores</h4><div className="mock-lista"><div className="mock-fila" /><div className="mock-fila" /><div className="mock-fila corta" /><div className="mock-fila" /></div></>)}
             </div>
             {isla && <div className="isla-aviso mock-isla" aria-hidden="true"><i className="fa-solid fa-bell"></i><span><strong>Aviso nuevo</strong></span></div>}
-            {carta && <div className="carta-desp dentro" role="dialog" aria-label="Avisos de prueba"><div className="avisos-carta"><header><h2><i className="fa-regular fa-bell" aria-hidden="true"></i> Avisos</h2></header><ul><li><button type="button"><span className="aviso-ico tono-aten"><i className="fa-solid fa-hourglass-half" aria-hidden="true"></i></span><span className="aviso-texto"><strong>Quedan 7 días</strong><small>para registrar noviembre</small></span></button></li></ul></div></div>}
+            {carta && <div className="carta-desp tres dentro" role="dialog" aria-label="Avisos de prueba"><CartaTres cabecera={<header className="ac-cab"><h2><i className="fa-regular fa-bell" aria-hidden="true"></i> Avisos</h2><span className="ac-n">1 sin ver</span></header>} cuerpo={<div className="avisos-carta"><ul><li><button type="button"><span className="aviso-ico tono-aten"><i className="fa-solid fa-hourglass-half" aria-hidden="true"></i></span><span className="aviso-texto"><strong>Quedan 7 días</strong><small>para registrar noviembre</small></span></button></li></ul></div>} pie={<div className="ac-pie"><button type="button" className="btn-texto">Marcar como vistos</button></div>} /></div>}
             {cortina && <button type="button" className="mock-cortina" onClick={() => setCortina(false)} aria-label="Cerrar la cortina de prueba"><span>¿Qué quieres<br />hacer hoy?</span><em>Toca para cerrar</em></button>}
           </div>
         </Dispositivo>
@@ -91,7 +94,11 @@ export default function Laboratorio() {
         <section className="lab-grupo">
           <h3>Modo oscuro</h3>
           <p>Arrastra la perilla por la ranura (o tócala). El cambio se revela como un círculo.</p>
-          <InterruptorTema />
+          <InterruptorTema etiqueta />
+        </section>
+        <section className="lab-grupo">
+          <h3>Lectura y movimiento</h3>
+          <Preferencias />
         </section>
         <section className="lab-grupo">
           <h3>Botones con vida</h3>

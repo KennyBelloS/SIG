@@ -4,6 +4,8 @@ import { useSesion } from '../lib/useSesion';
 import IndicadorChart, { TendenciaChart } from '../components/IndicadorChart';
 import PageHeader from '../components/PageHeader';
 import TablaMeses from '../components/TablaMeses';
+import BotonEstado from '../components/vida/BotonEstado';
+import { menosMovimiento } from '../lib/preferencias';
 import { usaComponentes, tieneApoyo, etiquetasDe, calcularValor, motivoSinCalculo, CALCULOS } from '../lib/calculo';
 import { traducirError } from '../lib/indicadores';
 import { avisar } from '../lib/toast';
@@ -41,6 +43,7 @@ export default function IndicadorDetalle() {
   const [mesAbierto, setMesAbierto] = useState(null);
   const [form, setForm] = useState({ valor: '', analisis: '', causa: '', accion: '', responsable_accion: '', fecha_compromiso: '' });
   const [guardando, setGuardando] = useState(false);
+  const [exito, setExito] = useState(false);
 
   async function cargar() {
     setCargando(true); setError(null);
@@ -129,12 +132,13 @@ export default function IndicadorDetalle() {
       });
       const cumple = cumpleMeta(indicador, valorDelFormulario(), mesAbierto);
       const nombreMes = MESES[mesAbierto - 1];
+      setExito(true); await new Promise(res => setTimeout(res, menosMovimiento() ? 120 : 700));   // el botón se tiñe de verde y dibuja un visto antes de cerrar
       setMesAbierto(null);
       await cargar();
       if (cumple === true) avisar(`${nombreMes} guardado: ¡cumple la meta!`, { tipo: 'ok', celebrar: true });
       else if (cumple === false) avisar(`${nombreMes} guardado: no alcanzó la meta. Quedó su plan de acción.`, { tipo: 'alerta' });
       else avisar(`${nombreMes} guardado.`, { tipo: 'ok' });
-    } catch (err) { setErrorForm(traducirError(err)); } finally { setGuardando(false); }
+    } catch (err) { setErrorForm(traducirError(err)); } finally { setGuardando(false); setExito(false); }
   }
 
   function descargarCSV() {
@@ -480,7 +484,7 @@ export default function IndicadorDetalle() {
               {puedeEditarMes && <button type="button" className="btn-secondary" onClick={sugerir}><i className="fa-solid fa-wand-magic-sparkles"></i> Sugerir plan de acción</button>}
               <div style={{ flex: 1 }} />
               <button type="button" className="btn-secondary" onClick={() => setMesAbierto(null)}>{puedeEditarMes ? 'Cancelar' : 'Cerrar'}</button>
-              {puedeEditarMes && <button type="submit" className="btn-primary" disabled={guardando}>{guardando ? 'Guardando…' : 'Guardar'}</button>}
+              {puedeEditarMes && <BotonEstado type="submit" estado={exito ? 'ok' : guardando ? 'cargando' : 'idle'}>Guardar</BotonEstado>}
             </div>
           </form>
         </Dialogo>

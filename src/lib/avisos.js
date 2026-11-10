@@ -26,6 +26,21 @@ const emitir = () => oyentes.forEach(f => f());
 
 export const avisosActuales = () => lista;
 
+/** Avisos del navegador: si la pestaña está en segundo plano, un aviso nuevo también sale como notificación del sistema (no llega con la app cerrada). */
+const NAV = 'tm:avisos-nav';
+export const avisosNavegadorSoportados = () => typeof Notification !== 'undefined';
+export const avisosNavegadorBloqueados = () => avisosNavegadorSoportados() && Notification.permission === 'denied';
+export const avisosNavegadorActivos = () => { try { return localStorage.getItem(NAV) === '1' && avisosNavegadorSoportados() && Notification.permission === 'granted'; } catch { return false; } };
+export async function activarAvisosNavegador(si) {
+  try {
+    if (!si) { localStorage.setItem(NAV, '0'); return false; }
+    if (!avisosNavegadorSoportados()) return false;
+    let p = Notification.permission; if (p === 'default') p = await Notification.requestPermission();
+    if (p === 'granted') { localStorage.setItem(NAV, '1'); return true; }
+  } catch { /* sin permiso */ }
+  return false;
+}
+
 /** Agrega avisos (sin repetir los que ya están). Si hay alguno sin ver, avisa UNA vez con 'tm:aviso-nuevo' para que salga el avión. */
 export function agregarAvisos(nuevos, { silencioso = false } = {}) {
   const v = vistos();
@@ -33,7 +48,10 @@ export function agregarAvisos(nuevos, { silencioso = false } = {}) {
   if (!reales.length) return;
   lista = [...reales, ...lista]; emitir();
   const sinVer = reales.filter(a => !a.visto);
-  if (!silencioso && sinVer.length) window.dispatchEvent(new CustomEvent('tm:aviso-nuevo', { detail: { ...sinVer[0], cantidad: sinVer.length } }));
+  if (!silencioso && sinVer.length) {
+    window.dispatchEvent(new CustomEvent('tm:aviso-nuevo', { detail: { ...sinVer[0], cantidad: sinVer.length } }));
+    if (document.hidden && avisosNavegadorActivos()) { try { new Notification(sinVer[0].titulo + (sinVer.length > 1 ? ` (+${sinVer.length - 1})` : ''), { body: sinVer[0].detalle || '', icon: '/icon-192.png' }); } catch { /* nada */ } }
+  }
 }
 export const agregarAviso = (a, o) => agregarAvisos([a], o);
 
@@ -58,5 +76,11 @@ export async function avisosDeLaSesion(sesion) {
   else if (restan <= 3) out.push({ id: `plazo-${anio}-${mesActual}-${restan}`, tono: restan <= 1 ? 'mal' : 'aten', icono: 'fa-hourglass-half', titulo: restan <= 0 ? `Hoy es el último día para registrar ${mes}` : `Quedan ${restan} ${restan === 1 ? 'día' : 'días'} para registrar ${mes}`, detalle: `El ${r.diaCierre} se cierra el mes.`, ruta: '/indicadores' });
   if (sesion?.puedeRegistrar && t.pendientes > 0 && !r.cerrado) out.push({ id: `pend-${anio}-${mesActual}-${t.pendientes}`, tono: 'aten', icono: 'fa-list-check', titulo: `Faltan ${t.pendientes} indicadores por registrar`, detalle: `De ${t.indicadores} que hay en ${mes}.`, ruta: '/indicadores' });
   if (t.sinPlan > 0) out.push({ id: `plan-${anio}-${mesActual}-${t.sinPlan}`, tono: 'mal', icono: 'fa-triangle-exclamation', titulo: `${t.sinPlan} ${t.sinPlan === 1 ? 'indicador no cumple y no tiene' : 'indicadores no cumplen y no tienen'} plan de acción`, detalle: 'Necesitan una acción correctiva.', ruta: '/indicadores' });
+  // La actividad de la Bitácora se elimina el día 1 de cada mes: se avisa a los administradores 5 días antes y al día siguiente de borrarla
+  if (sesion?.esAdmin) {
+    const hoy = new Date(), faltan = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate() - hoy.getDate() + 1;
+    if (faltan <= 5) out.push({ id: `bitacora-${anio}-${mesActual}-${faltan}`, tono: faltan <= 2 ? 'mal' : 'aten', icono: 'fa-clock-rotate-left', titulo: faltan === 1 ? 'Mañana se elimina la actividad de la Bitácora' : `En ${faltan} días se elimina la actividad de la Bitácora`, detalle: 'Descárgala en Excel antes de que se borre.', ruta: '/bitacora' });
+    else if (hoy.getDate() <= 2) out.push({ id: `bitacora-limpia-${anio}-${mesActual}`, tono: 'ok', icono: 'fa-broom', titulo: 'La actividad del mes anterior ya se eliminó', detalle: 'La Bitácora empieza de nuevo este mes.', ruta: '/bitacora' });
+  }
   return out;
 }

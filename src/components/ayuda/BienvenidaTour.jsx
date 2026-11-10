@@ -11,13 +11,18 @@ export default function BienvenidaTour() {
   const [abierto, setAbierto] = useState(false);
   const navegar = useNavigate();
   const { sesion } = useSesion();
+  const [esperaEntrada] = useState(() => { try { return sessionStorage.getItem('tm:entrando') === '1'; } catch { return false; } });
   useEffect(() => {
     let visto = true;
     try { visto = localStorage.getItem(CLAVE) === '1'; } catch { /* nada */ }
     if (visto) return undefined;
-    const t = setTimeout(() => setAbierto(true), 3600);   // después de la entrada animada
-    return () => clearTimeout(t);
-  }, []);
+    // enseguida: al terminar la entrada animada (o a los 0,5 s si no hubo entrada) se abre a pantalla completa
+    if (!esperaEntrada) { const t = setTimeout(() => setAbierto(true), 500); return () => clearTimeout(t); }
+    const abrir = () => setTimeout(() => setAbierto(true), 120);
+    window.addEventListener('tm:entrada-fin', abrir);
+    const respaldo = setTimeout(() => setAbierto(true), 4800);
+    return () => { window.removeEventListener('tm:entrada-fin', abrir); clearTimeout(respaldo); };
+  }, [esperaEntrada]);
   useEffect(() => { const abrir = () => setAbierto(true); window.addEventListener('indicadores:tour', abrir); return () => window.removeEventListener('indicadores:tour', abrir); }, []);
   useEffect(() => {
     if (!abierto) return undefined;
@@ -35,7 +40,7 @@ export default function BienvenidaTour() {
         <div><p className="tour-modal-hola">{primero ? `Hola, ${primero}` : 'Hola'}</p><h2 id="tour-modal-t">Así funciona el sistema</h2></div>
         <button type="button" className="btn-primary" onClick={cerrar} autoFocus>Entendido</button>
       </div>
-      <TourDispositivo rol={sesion?.rol || 'usuario'} compacto onFin={cerrar} onIr={ruta => { cerrar(); navegar(ruta); }} />
+      <TourDispositivo rol={sesion?.rol || 'usuario'} compacto pantalla onFin={cerrar} onIr={ruta => { cerrar(); navegar(ruta); }} />
     </div>
   );
 }

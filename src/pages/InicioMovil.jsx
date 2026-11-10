@@ -44,21 +44,25 @@ export default function InicioMovil() {
               <small>{d.cerrado ? 'Plazo' : 'Quedan'}</small>
               <strong>{d.cerrado ? <i className="fa-solid fa-lock" aria-hidden="true"></i> : <Numero valor={Math.max(0, restan)} />}</strong>
               <span>{d.cerrado ? `${MESES[mesActual - 1]} está cerrado` : restan === 0 ? 'hoy es el último día' : `${restan === 1 ? 'día' : 'días'} para registrar`}</span>
+              <span className="im-viz im-barra" aria-hidden="true"><i style={{ '--p': `${Math.min(100, Math.round((hoy.getDate() / d.diaCierre) * 100))}%` }} /></span>
             </article>
             <article className={`im-carta ${pct == null ? '' : pct >= 85 ? 'tono-bien' : pct >= 60 ? 'tono-aten' : 'tono-mal'}`}>
               <small>Cumplen su meta</small>
               <strong>{pct == null ? '—' : <><Numero valor={pct} /><em>%</em></>}</strong>
               <span>{evaluados ? `${t.cumplen} de ${evaluados} registrados` : 'aún sin resultados'}</span>
+              <svg className="im-viz im-anillo" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" className="a-f" /><circle cx="18" cy="18" r="15" className="a-v" pathLength="100" strokeDasharray="100" style={{ '--v': 100 - (pct || 0) }} transform="rotate(-90 18 18)" /></svg>
             </article>
             <article className={`im-carta ${t.pendientes ? 'tono-aten' : 'tono-bien'}`}>
               <small>Por registrar</small>
               <strong><Numero valor={t.pendientes} /></strong>
               <span>{t.pendientes === 1 ? 'indicador' : 'indicadores'} sin dato</span>
+              <span className="im-viz im-checks" aria-hidden="true"><i /><i /><i /><i /></span>
             </article>
             <article className={`im-carta ${t.sinPlan ? 'tono-mal' : 'tono-bien'}`}>
               <small>Sin plan</small>
               <strong><Numero valor={t.sinPlan} /></strong>
               <span>no cumplen y no tienen plan</span>
+              <i className="fa-solid fa-triangle-exclamation im-viz im-pulso" aria-hidden="true"></i>
             </article>
           </section>
 
@@ -78,7 +82,7 @@ export default function InicioMovil() {
                   <button type="button" className="im-proceso-cab" aria-expanded={on} onClick={() => setAbierto(on ? null : p.id)}>
                     <h3>{p.nombre}</h3>
                     <p>{p.registrados} de {p.total} registrados</p>
-                    <div className="im-casillas" aria-hidden="true">{p.items.map(it => <i key={it.id} className={`e-${it.estado}`} />)}</div>
+                    <div className="im-casillas" aria-hidden="true">{p.items.map((it, c) => <i key={it.id} className={`e-${it.estado}`} style={{ '--c': c }} />)}</div>
                     <span className="im-resumen">{p.cumplen > 0 && <b className="ok">{p.cumplen} cumplen</b>}{p.noCumplen > 0 && <b className="mal">{p.noCumplen} no cumplen</b>}{p.pendientes > 0 && <b className="aten">{p.pendientes} faltan</b>}</span>
                   </button>
                   {on && (
@@ -97,15 +101,11 @@ export default function InicioMovil() {
           {({ cerrar }) => {
             const e = carta.it.estado;
             const texto = { cumple: 'Cumple su meta este mes.', no: carta.it.sinPlan ? 'No cumple y todavía no tiene plan de acción.' : 'No cumple su meta: revisa su plan de acción.', pendiente: sesion?.puedeRegistrar ? 'Falta registrarlo este mes. Abre la ficha y toca el mes.' : 'Todavía no tiene dato este mes.', sinmeta: 'Tiene dato, pero no tiene una meta definida.' }[e];
-            return (
-              <div className="carta-prev">
-                <small>{carta.proceso}</small>
-                <h3>{carta.it.nombre}</h3>
-                <span className={`carta-prev-estado e-${e}`}><i className={`im-punto e-${e}`} aria-hidden="true" /> {{ cumple: 'Cumple', no: 'No cumple', pendiente: 'Por registrar', sinmeta: 'Sin meta' }[e]}</span>
-                <p>{texto}</p>
-                <button type="button" className="btn-primary" onClick={() => { cerrar(); navegar(`/indicadores/${carta.it.id}`); }}>Abrir la ficha <i className="fa-solid fa-arrow-right-long" aria-hidden="true"></i></button>
-              </div>
-            );
+            return {
+              cabecera: <div className="carta-prev cp-cab"><small>{carta.proceso}</small><h3>{carta.it.nombre}</h3></div>,
+              cuerpo: <div className="carta-prev cp-cuerpo"><span className={`carta-prev-estado e-${e}`}><i className={`im-punto e-${e}`} aria-hidden="true" /> {{ cumple: 'Cumple', no: 'No cumple', pendiente: 'Por registrar', sinmeta: 'Sin meta' }[e]}</span><p>{texto}</p></div>,
+              pie: <div className="carta-prev cp-pie"><button type="button" className="btn-primary" onClick={() => { cerrar(); navegar(`/indicadores/${carta.it.id}`); }}>Abrir la ficha <i className="fa-solid fa-arrow-right-long" aria-hidden="true"></i></button></div>,
+            };
           }}
         </CartaDesplegable>
       )}

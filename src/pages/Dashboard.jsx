@@ -8,6 +8,8 @@ import {
   getDashboard, getProcesos, getConfiguracionNotificaciones, mesReporteActual, exportarExcel, MESES, MESES_CORTO,
 } from '../lib/indicadores';
 
+import CartaDesplegable from '../components/vida/CartaDesplegable';
+import { useNavigate } from 'react-router-dom';
 const { anio: ANIO_ACTUAL, mesActual: MES_ACTUAL } = mesReporteActual();
 
 const nivel = pct => (pct == null ? 'nada' : pct >= 85 ? 'alto' : pct >= 60 ? 'medio' : 'bajo');
@@ -67,8 +69,42 @@ function TablaIndicadores({ tabla, anio }) {
   );
 }
 
-function MapaAnio({ matriz, anio, tipo }) {
+/** El resumen del año de una fila (un proceso o un indicador), en la hoja que se despliega. */
+function FichaFila({ fila, ancla, anio, tipo, onCerrar, onAbrir }) {
+  const evaluados = fila.meses.filter(c => !c.futuro && !c.fuera && c.pct != null);
+  const prom = evaluados.length ? Math.round(evaluados.reduce((a, c) => a + c.pct, 0) / evaluados.length) : null;
+  const ultimo = [...evaluados].pop(), perdidos = fila.meses.filter(c => c.perdido).length;
+  const mejor = evaluados.reduce((m, c) => (!m || c.pct > m.pct ? c : m), null);
   return (
+    <CartaDesplegable ancla={ancla} titulo={fila.label} ancho={380} alinear="centro" onCerrar={onCerrar}>
+      {({ cerrar }) => ({
+        cabecera: <header className="ac-cab"><small className="fr-tipo">{tipo === 'indicadores' ? 'Indicador' : 'Proceso'} · {anio}</small><h2>{fila.label}</h2></header>,
+        cuerpo: (
+          <div className="fr-cuerpo">
+            <div className="fr-cifras">
+              <div><b>{prom == null ? '—' : `${prom}${tipo === 'indicadores' ? '' : '%'}`}</b><span>{tipo === 'indicadores' ? 'cumplimiento promedio' : 'de los indicadores cumplen, en promedio'}</span></div>
+              <div><b>{ultimo ? MESES_CORTO[ultimo.mes - 1] : '—'}</b><span>{ultimo ? `último mes con dato: ${ultimo.pct}${tipo === 'indicadores' ? '' : '%'}` : 'aún sin datos'}</span></div>
+            </div>
+            <div className="fr-meses" aria-hidden="true">{fila.meses.map(c => <i key={c.mes} className={`mapa-celda n-${c.futuro ? 'futuro' : c.fuera ? 'fuera' : c.perdido ? 'perdido' : nivel(c.pct)}`} title={MESES_CORTO[c.mes - 1]} />)}</div>
+            <div className="fr-letras" aria-hidden="true">{MESES_CORTO.map(m => <span key={m}>{m[0]}</span>)}</div>
+            <ul className="fr-notas">
+              {mejor && <li><i className="fa-solid fa-trophy" aria-hidden="true"></i> Mejor mes: {MESES[mejor.mes - 1].toLowerCase()} ({mejor.pct}{tipo === 'indicadores' ? '' : '%'})</li>}
+              {perdidos > 0 && <li className="mal"><i className="fa-solid fa-calendar-xmark" aria-hidden="true"></i> {perdidos} {perdidos === 1 ? 'mes venció' : 'meses vencieron'} sin registrar</li>}
+              {!mejor && !perdidos && <li><i className="fa-solid fa-hourglass-start" aria-hidden="true"></i> Todavía no hay resultados este año.</li>}
+            </ul>
+          </div>
+        ),
+        pie: <div className="ac-pie"><button type="button" className="btn-secondary btn-chico" onClick={cerrar}>Cerrar</button><button type="button" className="btn-primary btn-chico" onClick={() => { cerrar(); setTimeout(onAbrir, 260); }}>{tipo === 'indicadores' ? 'Abrir la ficha' : 'Ver indicadores'} <i className="fa-solid fa-arrow-right" aria-hidden="true"></i></button></div>,
+      })}
+    </CartaDesplegable>
+  );
+}
+
+function MapaAnio({ matriz, anio, tipo }) {
+  const [ficha, setFicha] = useState(null);   // { fila, ancla }
+  const navegar = useNavigate();
+  return (
+    <>
     <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte">
       <div className="mapa" role="table" aria-label={`Cumplimiento por ${tipo === 'indicadores' ? 'indicador' : 'proceso'} y mes, ${anio}`}>
         <div className="mapa-fila mapa-cab" role="row">
@@ -77,7 +113,7 @@ function MapaAnio({ matriz, anio, tipo }) {
         </div>
         {matriz.map((f, r) => (
           <div className="mapa-fila" role="row" key={f.id}>
-            <div role="rowheader" className="mapa-nombre" title={f.label}>{f.label}</div>
+            <div role="rowheader" className="mapa-nombre"><button type="button" className="mapa-nombre-btn" title={`${f.label}: ver su año`} aria-haspopup="dialog" onClick={e => setFicha({ fila: f, ancla: e.currentTarget })}>{f.label}</button></div>
             {f.meses.map(c => {
               const n = c.futuro ? 'futuro' : c.fuera ? 'fuera' : c.perdido ? 'perdido' : nivel(c.pct);
               const texto = c.futuro ? 'Mes por venir' : c.fuera ? 'Fuera del rango elegido' : c.perdido ? 'Venció sin registrar' : c.pct == null
@@ -94,6 +130,8 @@ function MapaAnio({ matriz, anio, tipo }) {
         ))}
       </div>
     </div>
+      {ficha && <FichaFila fila={ficha.fila} ancla={ficha.ancla} anio={anio} tipo={tipo} onCerrar={() => setFicha(null)} onAbrir={() => navegar(tipo === 'indicadores' ? `/indicadores/${ficha.fila.id}` : '/indicadores')} />}
+    </>
   );
 }
 

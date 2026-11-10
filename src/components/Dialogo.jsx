@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 /** Diálogo modal accesible: cierra con Escape o al pulsar fuera, atrapa el foco
  *  mientras está abierto y lo devuelve al elemento que lo abrió. */
@@ -25,13 +26,12 @@ export default function Dialogo({ titulo, onCerrar, children, className = '', an
     return () => { document.removeEventListener('keydown', teclas); document.body.style.overflow = overflow; previo?.focus?.(); };
     // eslint-disable-next-line
   }, []);
-  return (
+  return createPortal(
     <div className="ind-modal-fondo" onMouseDown={e => { if (e.target === e.currentTarget) onCerrar(); }}>
       <div ref={caja} className={`ind-modal ${className}`} role="dialog" aria-modal="true" aria-label={titulo} style={ancho ? { maxWidth: ancho } : undefined}>
         {children}
       </div>
-    </div>
-  );
+    </div>, document.body);
 }
 
 /** Confirmación de acciones con consecuencias (enviar correos, cerrar meses, borrar). */

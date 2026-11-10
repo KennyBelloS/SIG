@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import Dialogo, { Confirmar } from './Dialogo';
 import GraficaMetas from './GraficaMetas';
+import BotonEstado from './vida/BotonEstado';
+import { menosMovimiento } from '../lib/preferencias';
 import { avisar } from '../lib/toast';
 import { CALCULOS, etiquetasDe } from '../lib/calculo';
 import {
@@ -63,6 +65,7 @@ export default function EditorIndicador({ indicador, procesos, procesoInicial, o
   const [pestana, setPestana] = useState('datos');
   const [resultados, setResultados] = useState({});
   const [guardando, setGuardando] = useState(false);
+  const [exito, setExito] = useState(false);
   const [error, setError] = useState(null);
   const [daDeBaja, setDaDeBaja] = useState(false);
   const refsPestana = useRef({});
@@ -122,8 +125,9 @@ export default function EditorIndicador({ indicador, procesos, procesoInicial, o
       if (crear) await crearIndicador({ ...cambios, proceso_id: Number(proceso_id) });
       else await actualizarIndicador(indicador.id, cambios);
       avisar(crear ? 'Indicador creado: ya aparece en la matriz.' : 'Cambios guardados.', { tipo: 'ok', celebrar: crear });
+      setExito(true); await new Promise(res => setTimeout(res, menosMovimiento() ? 120 : 650));
       await onGuardado();
-    } catch (err) { setError(traducirError(err)); } finally { setGuardando(false); }
+    } catch (err) { setError(traducirError(err)); } finally { setGuardando(false); setExito(false); }
   }
 
   async function darDeBaja() {
@@ -250,7 +254,7 @@ export default function EditorIndicador({ indicador, procesos, procesoInicial, o
 
           <aside className="editor-der" aria-label="Vista previa con tus cambios">
             <h3>Vista previa con tus cambios</h3>
-            <GraficaMetas indicador={borrador} resultados={resultados} anio={ANIO} />
+            {(Object.keys(resultados).length > 0 || borrador.meta_anual != null || borrador.meta_mensual != null || borrador.metas_mensuales) ? <GraficaMetas indicador={borrador} resultados={resultados} anio={ANIO} /> : <div className="editor-vacio"><i className="fa-solid fa-chart-column" aria-hidden="true"></i><strong>Aquí verás la gráfica</strong><span>Escribe una meta en «Medición y metas» y se dibuja al instante.</span></div>}
             <p className={`editor-resumen${resumen.evaluados === 0 ? '' : resumen.ahora === resumen.evaluados ? ' ok' : ''}`} role="status" aria-live="polite">
               {crear ? 'Cuando registres resultados, aquí verás cuántos cumplen con estas metas.'
                 : resumen.evaluados === 0 ? 'Todavía no hay resultados de este año para comparar con las metas.'
@@ -265,7 +269,7 @@ export default function EditorIndicador({ indicador, procesos, procesoInicial, o
           {!crear ? <button type="button" className="btn-secondary btn-baja" onClick={() => setDaDeBaja(true)}><i className="fa-solid fa-box-archive" aria-hidden="true"></i> Dar de baja</button> : <span />}
           <span style={{ display: 'flex', gap: 8 }}>
             <button type="button" className="btn-secondary" onClick={onCancelar}>Cancelar</button>
-            <button type="submit" className="btn-primary" disabled={guardando}>{guardando ? 'Guardando…' : crear ? 'Crear indicador' : 'Guardar cambios'}</button>
+            <BotonEstado type="submit" estado={exito ? 'ok' : guardando ? 'cargando' : 'idle'}>{crear ? 'Crear indicador' : 'Guardar cambios'}</BotonEstado>
           </span>
         </div>
       </form>

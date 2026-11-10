@@ -16,6 +16,9 @@ import HojaIndicadores from './movil/HojaIndicadores';
 import InstalarSheet from './movil/InstalarSheet';
 import Campana from './vida/Campana';
 import InterruptorTema from './vida/InterruptorTema';
+import Preferencias from './vida/Preferencias';
+import CartaDesplegable from './vida/CartaDesplegable';
+import { menosMovimiento } from '../lib/preferencias';
 
 /* Orden de los módulos: Dashboard, Matriz, Indicadores, Informe mensual; luego los de datos y administración,
    y "Cómo se usa" siempre al final. */
@@ -53,28 +56,45 @@ function Marca() {
 
 /** Menú de la persona: su correo y rol, y las dos cosas que puede hacer con su cuenta. */
 function MenuUsuario({ sesion, onClave, onNombre }) {
+  const btnU = useRef(null);
+  const [prefs, setPrefs] = useState(false);
   const [abierto, setAbierto] = useState(false);
   const ref = useRef(null);
-  useEffect(() => {
-    if (!abierto) return undefined;
-    const fuera = e => { if (ref.current && !ref.current.contains(e.target)) setAbierto(false); };
-    const tecla = e => { if (e.key === 'Escape') setAbierto(false); };
-    document.addEventListener('mousedown', fuera); document.addEventListener('keydown', tecla);
-    return () => { document.removeEventListener('mousedown', fuera); document.removeEventListener('keydown', tecla); };
-  }, [abierto]);
+  // la hoja (CartaDesplegable) se cierra sola con Escape o al tocar afuera; vive en un portal, por eso no se usa un «clic afuera» propio
   return (
     <div className="mast-usuario" ref={ref}>
-      <button className="mast-usuario-btn" aria-expanded={abierto} aria-haspopup="menu" onClick={() => setAbierto(a => !a)}>
+      <button className="mast-usuario-btn" ref={btnU} aria-expanded={abierto} aria-haspopup="dialog" onClick={() => setAbierto(a => !a)}>
         <span className="mast-usuario-datos" title={sesion?.email}><strong translate="no">{sesion?.nombreVisible || sesion?.email}</strong><small>{ROLES[sesion?.rol]?.nombre || 'Usuario'}</small></span>
         <i className={`fa-solid ${abierto ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i>
       </button>
+      {prefs && (
+        <CartaDesplegable ancla={btnU.current} titulo="Preferencias" ancho={340} onCerrar={() => setPrefs(false)}>
+          {({ cerrar }) => ({
+            cabecera: <header className="ac-cab"><h2><i className="fa-solid fa-sliders" aria-hidden="true"></i> Preferencias</h2></header>,
+            cuerpo: <div className="pref-cuerpo"><InterruptorTema etiqueta /><Preferencias /></div>,
+            pie: <div className="ac-pie"><span /><button type="button" className="btn-secondary btn-chico" onClick={cerrar}>Listo</button></div>,
+          })}
+        </CartaDesplegable>
+      )}
       {abierto && (
-        <div className="mast-menu" role="menu">
-          <button role="menuitem" onClick={() => { setAbierto(false); onNombre(); }}><i className="fa-solid fa-id-badge" aria-hidden="true"></i> Cambiar mi nombre</button>
-          <button role="menuitem" onClick={() => { setAbierto(false); onClave(); }}><i className="fa-solid fa-key" aria-hidden="true"></i> Cambiar mi contraseña</button>
-          <div className="mast-menu-tema" role="presentation"><span>Modo oscuro</span><InterruptorTema /></div>
-          <button role="menuitem" onClick={cerrarSesion}><i className="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Cerrar sesión</button>
-        </div>
+        <CartaDesplegable ancla={btnU.current} titulo="Mi cuenta" ancho={340} onCerrar={() => setAbierto(false)}>
+          {({ cerrar }) => ({
+            cabecera: (
+              <header className="um-cab">
+                <span className="um-avatar" aria-hidden="true">{(sesion?.nombreVisible || sesion?.email || '?').trim()[0]?.toUpperCase()}</span>
+                <div><h2 translate="no">{sesion?.nombreVisible || sesion?.email}</h2>{sesion?.nombre && <small translate="no">{sesion.email}</small>}<span className="um-rol">{ROLES[sesion?.rol]?.nombre || 'Usuario'}</span></div>
+              </header>
+            ),
+            cuerpo: (
+              <ul className="um-lista">
+                <li><button type="button" onClick={() => { setAbierto(false); onNombre(); }}><span className="hoja-ico"><i className="fa-solid fa-id-badge" aria-hidden="true"></i></span><span><strong>Cambiar mi nombre</strong><small>Cómo quieres que te llamen</small></span></button></li>
+                <li><button type="button" onClick={() => { setAbierto(false); onClave(); }}><span className="hoja-ico"><i className="fa-solid fa-key" aria-hidden="true"></i></span><span><strong>Cambiar mi contraseña</strong><small>Mínimo 8 caracteres</small></span></button></li>
+                <li><button type="button" onClick={() => { setAbierto(false); setPrefs(true); }}><span className="hoja-ico"><i className="fa-solid fa-sliders" aria-hidden="true"></i></span><span><strong>Preferencias</strong><small>Modo oscuro, tamaño de letra y movimiento</small></span></button></li>
+              </ul>
+            ),
+            pie: <div className="ac-pie"><button type="button" className="btn-secondary btn-chico" onClick={cerrar}>Cerrar</button><button type="button" className="btn-danger btn-chico" onClick={cerrarSesion}><i className="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Cerrar sesión</button></div>,
+          })}
+        </CartaDesplegable>
       )}
     </div>
   );
@@ -97,7 +117,11 @@ export default function Layout() {
   const [marcador, setMarcador] = useState(null);
   const [progreso, setProgreso] = useState(0);
   const movil = useMovil();
-  const variante = ['onda', 'sube', 'zoom', 'giro'][Math.max(0, ['inicio', 'dashboard', 'matriz', 'indicadores', 'informe', 'importar', 'novedades', 'configuracion', 'bitacora', 'ayuda'].indexOf(pathname.split('/')[1])) % 4];
+  // la dirección del deslizamiento sale de la posición del módulo en la barra: a la derecha entra desde la derecha, a la izquierda desde la izquierda
+  const idxMod = ['inicio', 'dashboard', 'matriz', 'indicadores', 'informe', 'importar', 'novedades', 'configuracion', 'bitacora', 'ayuda'].indexOf(pathname.split('/')[1]);
+  const dirRef = useRef({ idx: idxMod, dir: 'der' });
+  if (idxMod !== dirRef.current.idx) dirRef.current = { idx: idxMod, dir: idxMod >= dirRef.current.idx ? 'der' : 'izq' };
+  const variante = dirRef.current.dir;
   const navegar = useNavigate();
   const [hoja, setHoja] = useState(null);          // 'mas' | 'cuenta' | null
   const [crear, setCrear] = useState(null);        // { x, y } del botón rojo, o null
@@ -162,18 +186,18 @@ export default function Layout() {
     return (
       <div className="app movil-app">
         <a className="saltar" href="#contenido">Saltar al contenido</a>
-        <MovilBarra sesion={sesion} fabRef={fabRef} onCuenta={() => setHoja('cuenta')} onCrear={abrirCrear} campana={<Campana sesion={sesion} />} />
+        <MovilBarra titulo={((grupos.flatMap(g => g.items).find(i => pathname === i.to || pathname.startsWith(`${i.to}/`)) || {}).corto) || ((grupos.flatMap(g => g.items).find(i => pathname === i.to || pathname.startsWith(`${i.to}/`)) || {}).texto) || ((TITULOS.find(([ruta]) => pathname.startsWith(ruta)) || [])[1])} sesion={sesion} fabRef={fabRef} onCuenta={() => setHoja('cuenta')} onCrear={abrirCrear} campana={<Campana sesion={sesion} />} />
         {sesion?.rolNoLeido && (
           <div className="aviso-rol" role="alert"><i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong>No pude leer tu rol, por eso ves solo lo básico.</strong> Tus permisos no se perdieron. Recarga la página; si sigue igual, falta ejecutar la actualización de la base de datos.</div><button type="button" className="btn-secondary btn-chico" onClick={() => window.location.reload()}>Recargar</button></div>
         )}
         <FranjaPlazo />
-        <main id="contenido" className="contenido" data-trans={variante} tabIndex={-1} key={pathname.split('/').slice(0, 2).join('/')}><Outlet /></main>
+      <main id="contenido" className="contenido" data-dir={variante} tabIndex={-1} key={pathname.split('/').slice(0, 2).join('/')}><Outlet /></main>
         <MovilBuscar onBuscar={() => setPaleta(true)} />
         <MovilTabs onMas={() => setHoja('mas')} masActivo={rutasDeMas} />
         <BienvenidaTour />
         <Toaster />
-        {hoja === 'mas' && <HojaMas grupos={grupos} navegar={navegar} sesion={sesion} onCerrar={() => setHoja(null)} />}
-        {hoja === 'cuenta' && <HojaCuenta sesion={sesion} onCerrar={() => setHoja(null)} onNombre={() => setCambiandoNombre(true)} onClave={() => setCambiandoClave(true)} onInstalar={() => window.dispatchEvent(new Event('tm:instalar'))} />}
+        {hoja === 'mas' && <HojaMas grupos={grupos} navegar={navegar} sesion={sesion} onHoja={setHoja} onNombre={() => setCambiandoNombre(true)} onClave={() => setCambiandoClave(true)} onInstalar={() => window.dispatchEvent(new Event('tm:instalar'))} onCerrar={() => setHoja(null)} />}
+        {hoja === 'cuenta' && <HojaCuenta sesion={sesion} onCerrar={() => setHoja(null)} onNombre={() => setCambiandoNombre(true)} onClave={() => setCambiandoClave(true)} />}
         {crear && <CrearOverlay origen={crear} sesion={sesion} navegar={navegar} onHoja={setHoja} onCerrar={() => setCrear(null)} />}
         {(hoja === 'pendientes' || hoja === 'nocumplen') && <HojaIndicadores modo={hoja} navegar={navegar} onCerrar={() => setHoja(null)} />}
         {cambiandoClave && <CambiarClave onCerrar={() => setCambiandoClave(false)} />}
@@ -198,11 +222,11 @@ export default function Layout() {
               </div>
             ))}
           </nav>
-          <button type="button" className="mast-buscar" onClick={() => setPaleta(true)}>
+          <button type="button" className="mast-buscar" onClick={() => setPaleta(true)} aria-label="Buscar un indicador o una sección (Ctrl K)">
             <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span>Buscar</span><kbd>Ctrl K</kbd>
           </button>
           <Campana sesion={sesion} />
-          <button type="button" className="mast-crear" ref={fabRef} onClick={abrirCrear} aria-label="¿Qué quieres hacer hoy?" aria-haspopup="dialog"><i className="fa-solid fa-plus" aria-hidden="true"></i></button>
+          <button type="button" className="mast-crear" ref={fabRef} onClick={abrirCrear} aria-label="¿Qué quieres hacer hoy?" aria-haspopup="dialog"><span className="mast-crear-ico"><i className="fa-solid fa-plus" aria-hidden="true"></i></span><span className="mast-crear-txt" aria-hidden="true">Acciones</span></button>
           <MenuUsuario sesion={sesion} onClave={() => setCambiandoClave(true)} onNombre={() => setCambiandoNombre(true)} />
         </div>
       </header>
@@ -211,8 +235,7 @@ export default function Layout() {
         <div className="aviso-rol" role="alert"><i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong>No pude leer tu rol, por eso ves solo lo básico.</strong> Tus permisos no se perdieron. Recarga la página; si sigue igual, es que falta ejecutar la actualización de la base de datos (el SQL de la versión nueva en Supabase → SQL Editor) o hay un problema de conexión.</div><button type="button" className="btn-secondary btn-chico" onClick={() => window.location.reload()}>Recargar</button></div>
       )}
       <FranjaPlazo />
-
-      <main id="contenido" className="contenido" data-trans={variante} tabIndex={-1} key={pathname.split('/').slice(0, 2).join('/')}><Outlet /></main>
+      <main id="contenido" className="contenido" data-dir={variante} tabIndex={-1} key={pathname.split('/').slice(0, 2).join('/')}><Outlet /></main>
       <BienvenidaTour />
       <Toaster />
       {cambiandoClave && <CambiarClave onCerrar={() => setCambiandoClave(false)} />}
