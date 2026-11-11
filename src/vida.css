@@ -205,7 +205,7 @@ body.movil .mv-barra .mv-acciones{ gap:6px; } body.movil .mv-barra .campana{ wid
 .carta-prev p{ color:var(--ink-2); font-size:calc(15.5px * var(--esc,1)); } .carta-prev .btn-primary{ justify-self:start; margin-top:4px; gap:8px; }
 
 /* =====================================================================
-   RONDA 2: hoja de tres partes, mariposa, interruptor de la foto, preferencias, letra escalable
+   RONDA 2: hoja de tres partes, colibrí, interruptor de la foto, preferencias, letra escalable
    ===================================================================== */
 html{ --esc:1.14; } html[data-letra="normal"]{ --esc:1.14; } html[data-letra="grande"]{ --esc:1.3; } html[data-letra="enorme"]{ --esc:1.5; }
 html[data-movimiento="reducido"] *, html[data-movimiento="reducido"] *::before, html[data-movimiento="reducido"] *::after{ animation-duration:.01ms !important; animation-delay:0s !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; transition-delay:0s !important; scroll-behavior:auto !important; }
@@ -231,7 +231,7 @@ html[data-movimiento="reducido"] *, html[data-movimiento="reducido"] *::before, 
 .ct-2 .avisos-carta{ padding:8px 10px; } .ct-2 .avisos-vacio{ padding:22px 16px; }
 .carta-prev.cp-cab{ padding:18px 20px 10px; } .carta-prev.cp-cuerpo{ padding:12px 20px; } .carta-prev.cp-pie{ padding:10px 20px 18px; }
 
-/* ---- la mariposa y el escenario ---- */
+/* ---- el colibrí y el escenario ---- */
 .rv2{ display:grid; grid-template-columns:minmax(220px,.95fr) minmax(0,1.35fr); gap:22px; padding-top:36px; align-items:stretch; }
 .rv-lista{ list-style:none; margin:0; padding:0; display:grid; gap:8px; align-content:start; }
 .rv-fila{ width:100%; display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:18px; background:#fff; border:1px solid var(--line); text-align:left; transition:transform .4s var(--curva-resorte), box-shadow .4s, background .3s; }
@@ -248,7 +248,7 @@ html[data-movimiento="reducido"] *, html[data-movimiento="reducido"] *::before, 
 .rv-destacado small{ font-size:calc(15px * var(--esc,1)); font-weight:700; color:var(--ink-2); } .rv-destacado strong{ font:600 calc(52px * var(--esc,1))/1.02 var(--serif); letter-spacing:-.015em; overflow-wrap:break-word; } .rv-destacado p{ font-size:calc(17px * var(--esc,1)); color:var(--ink-2); }
 .rv-bicho{ position:absolute; left:0; top:0; z-index:5; pointer-events:none; will-change:transform; filter:drop-shadow(0 8px 6px rgba(0,0,0,.25)); }
 .rv-llevado{ position:absolute; left:50%; top:46px; width:44px; height:44px; margin-left:-22px; border-radius:14px; display:grid; place-items:center; background:var(--f-100); color:var(--f-800); font-size:18px; box-shadow:0 10px 18px -8px rgba(0,0,0,.5), 0 0 0 2px rgba(201,147,43,.6); animation:llevado .35s var(--curva-resorte) both; } @keyframes llevado{ from{ transform:scale(.3) translateY(-14px); opacity:0; } }
-.mariposa .m-izq, .mariposa .m-der{ transform-box:fill-box; animation:aletea .22s ease-in-out infinite alternate; } .mariposa .m-izq{ transform-origin:100% 50%; } .mariposa .m-der{ transform-origin:0% 50%; animation-delay:0s; }
+.colibri .m-izq, .colibri .m-der{ transform-box:fill-box; animation:aletea .09s ease-in-out infinite alternate; } .colibri .m-izq{ transform-origin:100% 50%; } .colibri .m-der{ transform-origin:0% 50%; animation-delay:0s; }
 @keyframes aletea{ from{ transform:scaleX(1); } to{ transform:scaleX(.28); } }
 @media (max-width:900px){ .rv2{ grid-template-columns:1fr; padding-top:30px; } .rv-destacado{ min-height:170px; } .rv-destacado strong{ font-size:calc(42px * var(--esc,1)); } }
 
@@ -404,6 +404,11 @@ body.movil .im-proceso-cab p{ font-size:calc(15px * var(--esc,1)); } body.movil 
   .ent2-der{ margin:0; padding:22px 18px calc(24px + var(--seguro-abajo,0px)); } .ent2-form header h2{ font-size:calc(38px * var(--esc,1)); }
 }
 @media (max-height:700px) and (max-width:900px){ .ent2-prev{ display:none; } }
+/* anchos intermedios (tablet, ventana angosta o con zoom): la vista previa no debe estirarse y dejar un hueco vacío */
+@media (min-width:901px) and (max-width:1180px){
+  .ent2-izq{ justify-content:center; gap:clamp(10px,2vh,20px); }
+  .ent2-prev{ flex:0 1 auto; max-height:40vh; }
+}
 @media (prefers-reduced-motion:reduce){ .ent2-aurora, .ent2-tarjeta, .caret{ animation:none; } }
 
 /* ---- arreglos de la ronda: el recorrido cubre TODA la pantalla (una regla vieja lo limitaba a 980 px) y el login del celular deja el formulario a la vista ---- */
@@ -540,3 +545,126 @@ html[data-movimiento="reducido"] .contenido[data-dir]{ animation:none !important
 /* el texto «Acciones» solo aparece cuando sobra sitio de verdad (no crece con la letra) */
 .mast-crear{ font-size:15.5px; } @media (max-width:1799px){ .mast-crear{ padding:0 7px; } .mast-crear-txt{ display:none; } }
 .mast-usuario-datos strong{ font-size:15px; } .mast-usuario-datos small{ font-size:12.5px; }
+
+/* el contador del atajo va después del texto en el código (para el lector de pantalla) y se pinta sobre la esquina del ícono */
+.mas-atajo{ position:relative; }
+.mas-atajo > b{ position:absolute; top:8px; left:calc(50% + 12px); min-width:24px; height:24px; padding:0 6px; border-radius:12px; background:var(--wine); color:#fff; font:700 13px/24px var(--texto); text-align:center; box-shadow:0 0 0 2px #fff; }
+.mas-atajo:not(.tono-mal) > b{ background:var(--gold); color:var(--f-950); }
+
+/* ===== RONDA 4: el celular no crece tanto (antes 1,3 y se cortaban cosas) ===== */
+@media (max-width:900px){ html, html[data-letra="normal"]{ --esc:1; } html[data-letra="grande"]{ --esc:1.1; } html[data-letra="enorme"]{ --esc:1.26; } }
+
+
+/* =====================================================================
+   RONDA 4: celular — inicio en rejilla, barra y pestañas con todo a la vista, «Más» con módulos y otras opciones
+   ===================================================================== */
+.im-tira{ display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; overflow:visible !important; scroll-snap-type:none !important; margin:0 !important; padding:2px 0 8px !important; }
+@media (min-width:760px){ .im-tira{ grid-template-columns:repeat(4,minmax(0,1fr)); } }
+.im-carta{ width:auto !important; min-width:0 !important; flex:none !important; padding:12px 14px !important; }
+.im-carta strong{ font-size:calc(40px * var(--esc,1)) !important; line-height:1; margin:4px 0 6px; }
+.im-carta > span{ font-size:calc(13.5px * var(--esc,1)) !important; line-height:1.25; }
+.im-vivo{ margin:6px 0 14px; } .im-vivo .panel{ margin:0; padding:14px 14px 16px; }
+.im-asi-tarjeta{ width:100%; display:flex; align-items:center; gap:14px; padding:14px 16px; margin:4px 0 16px; border-radius:20px; text-align:left; color:#fff; background:linear-gradient(180deg,#1F7A44,#145A31); border:1px solid rgba(255,255,255,.35); box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 14px 24px -16px rgba(5,30,15,.8); }
+.im-asi-ico{ flex:none; width:46px; height:46px; border-radius:15px; display:grid; place-items:center; font-size:24px; background:linear-gradient(180deg,#EDBB4D,#C9932B); color:var(--f-950); } .im-asi-txt{ flex:1; min-width:0; } .im-asi-txt strong{ display:block; font:600 calc(22px * var(--esc,1))/1.05 var(--serif); } .im-asi-txt small{ display:block; margin-top:3px; font-size:calc(13.5px * var(--esc,1)); color:rgba(255,255,255,.82); line-height:1.25; } .im-asi-tarjeta > i{ opacity:.8; }
+.im-proceso-cab h3{ font-size:calc(19px * var(--esc,1)) !important; line-height:1.1; overflow-wrap:anywhere; hyphens:auto; }
+.im-proceso-cab p{ font-size:calc(13.5px * var(--esc,1)); }
+/* el colibrí en el celular: las piezas en dos columnas y el escenario debajo */
+@media (max-width:900px){ .rv-lista{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; } .rv-fila{ padding:8px 9px; min-height:0; gap:8px; } .rv-fila-txt small{ font-size:calc(11.5px * var(--esc,1)); } .rv-fila-txt strong{ font-size:calc(14.5px * var(--esc,1)); overflow-wrap:anywhere; line-height:1.1; } .rv-chip{ width:30px; height:30px; font-size:14px; } .rv-destacado{ min-height:150px; } .rv-destacado strong{ font-size:calc(34px * var(--esc,1)); overflow-wrap:anywhere; } }
+
+/* barra de arriba: logo, sección, lupa, campana, avatar y + (la búsqueda ya no flota sobre el contenido) */
+.mv-acciones{ gap:6px; }
+.mv-lupa{ width:40px; height:40px; border-radius:50%; display:grid; place-items:center; color:#fff; font-size:16px; background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,.08)); border:1px solid rgba(255,255,255,.34); box-shadow:inset 0 1px 0 rgba(255,255,255,.4); }
+body.movil .mv-barra{ padding:6px 8px 6px 8px; } body.movil .mv-seccion span{ font-size:calc(20px * var(--esc,1)); }
+body.movil .contenido{ padding-bottom:calc(112px + var(--seguro-abajo)) !important; }
+/* pestañas de abajo: cinco, todas con su nombre */
+body.movil .mv-tabs{ display:grid !important; grid-template-columns:repeat(5,minmax(0,1fr)); gap:2px; padding:6px; border-radius:30px; }
+body.movil .mv-tabs a, body.movil .mv-tabs button{ display:flex !important; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-width:0; width:auto; min-height:56px; padding:6px 2px; border-radius:24px; }
+body.movil .mv-tabs i{ font-size:19px; margin:0; }
+body.movil .mv-tabs span{ display:block !important; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:700 11.5px/1 var(--texto); opacity:1 !important; transform:none !important; width:auto !important; margin:0; padding:0; }
+
+/* «Más»: lo principal (módulos) separado con claridad de lo demás */
+.mas-banda{ display:flex; align-items:center; gap:10px; margin:20px 0 6px; padding:11px 14px; border-radius:14px; color:#fff; font:700 calc(14px * var(--esc,1))/1 var(--texto); letter-spacing:.1em; text-transform:uppercase; }
+.mas-banda b{ margin-left:auto; min-width:26px; height:26px; padding:0 8px; border-radius:13px; display:grid; place-items:center; background:var(--gold); color:var(--f-950); font-size:13px; letter-spacing:0; }
+.mas-banda-mod{ background:linear-gradient(180deg,#1F7A44,#145A31); } .mas-banda-otras{ background:linear-gradient(180deg,#5B6B62,#46554C); margin-top:26px; }
+.mas-banda-sub{ margin:2px 4px 6px; color:var(--ink-3); font-size:calc(13px * var(--esc,1)); line-height:1.35; } .mas-banda-sub i{ color:var(--f-800); }
+.mas-mod-grupo{ margin:0; } .mas-mod-grupo h4{ margin:14px 4px 8px; color:var(--ink-3); font:700 calc(12px * var(--esc,1))/1 var(--texto); letter-spacing:.1em; text-transform:uppercase; }
+.mas-mod-red{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.mas-mod{ position:relative; width:100%; height:100%; min-height:108px; display:grid; align-content:start; justify-items:start; gap:5px; padding:12px; text-align:left; border-radius:18px; background:#fff; border:1px solid var(--line); box-shadow:0 10px 20px -16px rgba(15,61,34,.6); transition:transform .3s var(--curva-resorte); } .mas-mod:active{ transform:scale(.97); }
+.mas-mod.fija{ border:1.5px solid var(--f-800); background:linear-gradient(180deg,#fff,#EAF3EC); }
+.mas-mod-ico{ width:40px; height:40px; border-radius:13px; display:grid; place-items:center; font-size:18px; background:var(--f-100); color:var(--f-800); } .mas-mod.fija .mas-mod-ico{ background:var(--f-800); color:#fff; }
+.mas-mod strong{ font-size:calc(16px * var(--esc,1)); line-height:1.1; } .mas-mod small{ font-size:calc(12.5px * var(--esc,1)); line-height:1.25; color:var(--ink-3); overflow-wrap:anywhere; }
+.mas-mod-pin{ position:absolute; top:10px; right:10px; font-size:12px; color:var(--f-800); } .mas-mod .hoja-insignia{ position:absolute; top:8px; right:32px; }
+
+/* «Acciones» (computador): verde, como la barra */
+.mast-crear{ background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,.06)), linear-gradient(180deg,#1F7A44,#145A31) !important; color:#fff !important; border:1px solid rgba(255,255,255,.42) !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 10px 20px -12px rgba(5,30,15,.85) !important; }
+.mast-crear-txt{ color:#fff; }
+body.movil .mv-tabs a:not(.activo) span, body.movil .mv-tabs button:not(.activo) span{ position:static !important; width:auto !important; height:auto !important; clip:auto !important; clip-path:none !important; overflow:hidden !important; color:rgba(255,255,255,.82); }
+body.movil .mv-tabs .activo span{ color:#fff; }
+.im-proceso-cab h3{ font-size:calc(17.5px * var(--esc,1)) !important; overflow-wrap:break-word !important; hyphens:manual !important; }
+
+/* ---------- bitácora: eliminación automática (primer martes) y manual ---------- */
+.aud-limpieza{ display:block; padding:16px 18px; } .aud-limpieza-cab{ display:flex; align-items:center; gap:14px; } .aud-limpieza-cab > div{ flex:1; min-width:0; } .aud-limpieza-cab .btn-primary, .aud-limpieza-cab .btn-secondary{ flex:none; }
+.aud-limpieza.cancelada{ background:linear-gradient(180deg,#F1F3F0,#E8ECE8); border-color:#C9D1CA; border-left-color:#7C8A80; } .aud-limpieza.cancelada > .aud-limpieza-cab > i{ color:#5B6B62; }
+.aud-limpieza.plazo{ background:linear-gradient(180deg,#FCEFE0,#F8E2C6); border-color:#E7B97A; border-left-color:var(--wine); } .aud-limpieza.plazo > .aud-limpieza-cab > i{ color:var(--wine); }
+.aud-limpieza-acc{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:14px; padding-top:12px; border-top:1px dashed rgba(0,0,0,.18); } .aud-limpieza-acc > span{ font-weight:700; margin-right:4px; }
+.acciones-dialogo{ display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; margin-top:16px; }
+@media (max-width:760px){ .aud-limpieza-cab{ flex-wrap:wrap; } .aud-limpieza-cab .btn-primary, .aud-limpieza-cab .btn-secondary{ width:100%; } .aud-limpieza-acc .btn-chico{ flex:1 1 100%; } }
+/* celular: encabezados de página más compactos y las pestañas de sección lado a lado */
+@media (max-width:900px){ body.movil .cajetin h1, body.movil .page-header h1{ font-size:calc(clamp(30px,8.6vw,36px) * var(--esc,1)) !important; line-height:1.02; } body.movil .modo-importar{ display:grid !important; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:8px; } }
+
+/* =====================================================================
+   RONDA 4: inicio de sesión con dos formas de entrar, PIN y recuperación
+   ===================================================================== */
+.ent2-modos{ position:relative; display:grid; grid-template-columns:1fr 1fr; gap:0; padding:4px; margin:2px 0 14px; border-radius:18px; background:var(--f-100); border:1px solid var(--line); }
+.ent2-modos-hilo{ position:absolute; top:4px; bottom:4px; left:4px; width:calc(50% - 4px); border-radius:14px; background:#fff; box-shadow:0 8px 18px -10px rgba(15,61,34,.7), inset 0 0 0 1px rgba(22,101,52,.18), 0 0 0 0 transparent; transform:translateX(calc(var(--pos,0) * 100%)); transition:transform .5s var(--curva-resorte); }
+.ent2-modo{ position:relative; z-index:1; display:flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:6px 8px; border-radius:14px; text-align:left; color:var(--ink-2); transition:color .3s; }
+.ent2-modo i{ font-size:20px; flex:none; } .ent2-modo span{ display:grid; line-height:1.15; min-width:0; } .ent2-modo b{ font-size:calc(15px * var(--esc,1)); font-weight:700; } .ent2-modo small{ font-size:calc(11.5px * var(--esc,1)); color:var(--ink-3); }
+.ent2-modo[aria-selected="true"]{ color:var(--f-800); } .ent2-modo[aria-selected="true"] small{ color:var(--ink-2); }
+.ent2-modo:focus-visible{ outline:3px solid var(--gold); outline-offset:-3px; }
+.ent2-campos{ display:grid; gap:12px; animation:campos-entra .45s var(--curva) both; } @keyframes campos-entra{ from{ opacity:0; transform:translateX(18px); } }
+.ent2-guia{ margin:0; color:var(--ink-2); font-size:calc(15px * var(--esc,1)); line-height:1.4; } .ent2-nota{ margin:0; color:var(--ink-3); font-size:calc(13.5px * var(--esc,1)); }
+.ent2-fila{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; } .ent2-fila .entrada-recordar{ margin:0; }
+.ent2-pin-cab{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font-weight:700; font-size:calc(14px * var(--esc,1)); } .ent2-pin-cab .ver-clave{ position:static; }
+.pin-cajas{ display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
+.pin-caja{ min-width:0; width:100%; height:58px; padding:0; text-align:center; font:600 26px var(--serif); color:var(--f-900); border-radius:14px; border:1.5px solid var(--line-strong); background:#fff; transition:transform .2s var(--curva-resorte), border-color .2s, background .2s, box-shadow .2s; caret-color:transparent; }
+.pin-caja:focus{ outline:none; border-color:var(--gold); box-shadow:0 0 0 4px rgba(201,147,43,.35); transform:translateY(-2px); }
+.pin-caja.llena{ background:var(--f-100); border-color:var(--f-700); animation:pin-pop .3s var(--curva-resorte); } @keyframes pin-pop{ 40%{ transform:scale(1.12); } }
+.pin-error .pin-caja{ border-color:var(--wine); background:var(--wine-bg); animation:pin-sacude .45s; } @keyframes pin-sacude{ 20%,60%{ transform:translateX(-7px); } 40%,80%{ transform:translateX(7px); } }
+.ent2-olvide .ent2-volver{ margin-top:6px; align-self:flex-start; }
+.ent2-envio{ display:grid; justify-items:center; text-align:center; gap:10px; padding:8px 4px 4px; } .ent2-envio strong{ font:600 calc(26px * var(--esc,1))/1.1 var(--serif); color:var(--f-800); } .ent2-envio p{ margin:0; color:var(--ink-2); line-height:1.45; }
+.ent2-avion{ width:86px; height:86px; border-radius:50%; display:grid; place-items:center; font-size:36px; color:#fff; background:linear-gradient(160deg,var(--f-700),var(--f-900)); box-shadow:0 14px 28px -12px rgba(15,61,34,.8); } .ent2-avion i{ animation:avion-sale .9s var(--curva-resorte) both; } @keyframes avion-sale{ from{ transform:translate(-40px,30px) scale(.4) rotate(-20deg); opacity:0; } }
+.ent2-avion.ok i{ animation:visto-pop .6s var(--curva-resorte) both; } @keyframes visto-pop{ from{ transform:scale(.2); opacity:0; } }
+.ent2-reglas{ list-style:none; margin:0; padding:0; display:grid; gap:6px; font-size:calc(14.5px * var(--esc,1)); } .ent2-reglas li{ display:flex; align-items:center; gap:8px; color:var(--ink-3); transition:color .25s; } .ent2-reglas li.ok{ color:var(--f-800); font-weight:600; } .ent2-reglas li.ok i{ animation:pin-pop .35s var(--curva-resorte); }
+.ent2-solo .ent2-prev{ display:none; }
+
+/* ---------- crear accesos (administrador) ---------- */
+.tipos-acceso{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:4px 0 16px; }
+.tipo-acceso{ display:flex; align-items:center; gap:12px; text-align:left; padding:14px 16px; border-radius:16px; background:#fff; border:1.5px solid var(--line-strong); transition:transform .3s var(--curva-resorte), border-color .2s, background .2s, box-shadow .2s; } .tipo-acceso:hover{ transform:translateY(-2px); }
+.tipo-acceso i{ width:42px; height:42px; border-radius:14px; display:grid; place-items:center; flex:none; background:var(--f-100); color:var(--f-800); font-size:18px; } .tipo-acceso span{ display:grid; min-width:0; line-height:1.2; } .tipo-acceso b{ font-size:calc(15.5px * var(--esc,1)); } .tipo-acceso small{ color:var(--ink-3); font-size:calc(12.5px * var(--esc,1)); }
+.tipo-acceso.activo{ border-color:var(--f-700); background:linear-gradient(180deg,#fff,var(--f-100)); box-shadow:0 12px 22px -16px rgba(15,61,34,.8), inset 0 0 0 1px rgba(22,101,52,.25); } .tipo-acceso.activo i{ background:var(--f-800); color:#fff; }
+@media (max-width:820px){ .tipos-acceso{ grid-template-columns:1fr; } }
+.procesos-asignar{ border:0; padding:0; margin:0; grid-column:1/-1; } .procesos-asignar legend{ font-weight:700; margin-bottom:8px; padding:0; }
+.procesos-chips{ display:flex; flex-wrap:wrap; gap:8px; } .proceso-chip{ padding:9px 14px; border-radius:999px; border:1.5px solid var(--line-strong); background:#fff; font-weight:600; font-size:calc(14px * var(--esc,1)); transition:transform .25s var(--curva-resorte), background .2s, color .2s, border-color .2s; } .proceso-chip:active{ transform:scale(.94); } .proceso-chip.on{ background:var(--f-800); color:#fff; border-color:var(--f-800); }
+.pin-grande{ display:flex; gap:8px; justify-content:center; margin:6px 0 4px; } .pin-grande span{ width:48px; height:62px; display:grid; place-items:center; border-radius:14px; background:#fff; border:1.5px solid var(--f-700); font:600 34px var(--serif); color:var(--f-900); box-shadow:0 10px 18px -12px rgba(15,61,34,.8); animation:pin-pop .5s var(--curva-resorte) both; animation-delay:calc(var(--i) * 70ms); }
+.chip-acceso{ display:inline-block; padding:4px 11px; border-radius:999px; background:var(--f-100); color:var(--f-800); font-weight:700; font-size:calc(13px * var(--esc,1)); } .procesos-resumen{ display:block; margin-top:4px; max-width:260px; }
+
+/* el login en teléfonos: sin la vista previa (que empujaba el formulario fuera de la pantalla) y con las ayudas bien alineadas */
+@media (max-width:760px){ .ent2 .ent2-prev{ display:none; } }
+.ent2-pin-cab .ver-clave{ position:static !important; transform:none !important; margin:0; width:30px; height:30px; display:grid; place-items:center; }
+.ent2-volver{ display:inline-flex; align-items:center; gap:8px; }
+
+/* =====================================================================
+   RONDA 4 (b): celular más compacto y botones de crear en verde
+   ===================================================================== */
+@media (max-width:900px){ html, html[data-letra="normal"]{ --esc:1; } html[data-letra="grande"]{ --esc:1.14; } html[data-letra="enorme"]{ --esc:1.3; } }
+/* el + del celular y «Acciones» del computador, en el verde de la marca */
+.mv-fab{ background:linear-gradient(180deg,#2BA45E 0%,#166534 58%,#0F3D22 100%) !important; color:#fff !important; border:1px solid rgba(255,255,255,.4) !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 10px 18px -8px rgba(3,24,12,.85) !important; } .mv-fab i{ color:#fff !important; }
+.mast-crear{ background:linear-gradient(180deg,#2BA45E 0%,#166534 58%,#0F3D22 100%) !important; color:#fff !important; border:1px solid rgba(255,255,255,.4) !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 10px 18px -8px rgba(3,24,12,.85) !important; } .mast-crear-txt{ color:#fff; }
+.mast-crear:hover{ box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 16px 26px -12px rgba(3,24,12,.9), 0 0 0 3px rgba(201,147,43,.45) !important; }
+
+/* controles del recorrido (bajo el iPhone y la MacBook): barra de vidrio verde con botones redondos, el de reproducir en dorado */
+.td-control{ gap:10px; padding:7px 10px; border-radius:999px; background:linear-gradient(180deg,#1e7a45,#0F3D22) !important; border:1px solid rgba(255,255,255,.3); box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 14px 24px -14px rgba(3,24,12,.8); }
+.td-control > button.btn-texto{ flex:none; width:44px; height:44px; min-height:0; padding:0; border-radius:50%; display:grid; place-items:center; color:#fff !important; background:rgba(255,255,255,.16) !important; border:1px solid rgba(255,255,255,.34) !important; font-size:16px; transition:transform .25s var(--curva-resorte), background .2s; }
+.td-control > button.btn-texto:hover:not(:disabled){ background:rgba(255,255,255,.28) !important; transform:translateY(-1px); } .td-control > button.btn-texto:active:not(:disabled){ transform:scale(.9); } .td-control > button.btn-texto:disabled{ opacity:.35; }
+.td-control > button.rec-play{ background:linear-gradient(180deg,#EDBB4D,#C9932B) !important; color:#2a1d04 !important; border-color:rgba(255,255,255,.55) !important; }
+.td-control .rec-segmentos{ gap:4px; min-width:0; } .td-control .rec-seg{ height:6px; background:rgba(255,255,255,.28) !important; } .td-control .rec-seg.hecho{ background:rgba(255,255,255,.88) !important; } .td-control .rec-seg u{ background:var(--gold) !important; }

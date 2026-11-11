@@ -10,7 +10,7 @@ import CambiarNombre from './CambiarNombre';
 import Paleta from './Paleta';
 import { registrarIngresoUnaVez, latido } from '../lib/accesos';
 import { useMovil } from '../lib/movil';
-import { MovilBarra, MovilBuscar, MovilTabs, HojaMas, HojaCuenta } from './movil/Piezas';
+import { MovilBarra, MovilTabs, HojaMas, HojaCuenta } from './movil/Piezas';
 import CrearOverlay from './movil/CrearOverlay';
 import HojaIndicadores from './movil/HojaIndicadores';
 import InstalarSheet from './movil/InstalarSheet';
@@ -182,21 +182,22 @@ export default function Layout() {
   const clase = ({ isActive }) => `mast-enlace${isActive ? ' activo' : ''}`;
 
   if (movil) {
-    const rutasDeMas = !['/inicio', '/indicadores', '/matriz'].some(r => pathname === r || pathname.startsWith(`${r}/`));
+    // Mismo orden que en el computador: Inicio, Dashboard (si es admin), Matriz, Indicadores.
+    const dashboard = grupos.flatMap(g => g.items).find(i => i.to === '/dashboard');
+    const rutasDeMas = !['/inicio', dashboard?.to, '/matriz', '/indicadores'].filter(Boolean).some(r => pathname === r || pathname.startsWith(`${r}/`));
     return (
       <div className="app movil-app">
         <a className="saltar" href="#contenido">Saltar al contenido</a>
-        <MovilBarra titulo={((grupos.flatMap(g => g.items).find(i => pathname === i.to || pathname.startsWith(`${i.to}/`)) || {}).corto) || ((grupos.flatMap(g => g.items).find(i => pathname === i.to || pathname.startsWith(`${i.to}/`)) || {}).texto) || ((TITULOS.find(([ruta]) => pathname.startsWith(ruta)) || [])[1])} sesion={sesion} fabRef={fabRef} onCuenta={() => setHoja('cuenta')} onCrear={abrirCrear} campana={<Campana sesion={sesion} />} />
+        <MovilBarra onBuscar={() => setPaleta(true)} titulo={((grupos.flatMap(g => g.items).find(i => pathname === i.to || pathname.startsWith(`${i.to}/`)) || {}).corto) || ((grupos.flatMap(g => g.items).find(i => pathname === i.to || pathname.startsWith(`${i.to}/`)) || {}).texto) || ((TITULOS.find(([ruta]) => pathname.startsWith(ruta)) || [])[1])} sesion={sesion} fabRef={fabRef} onCuenta={() => setHoja('cuenta')} onCrear={abrirCrear} campana={<Campana sesion={sesion} />} />
         {sesion?.rolNoLeido && (
           <div className="aviso-rol" role="alert"><i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong>No pude leer tu rol, por eso ves solo lo básico.</strong> Tus permisos no se perdieron. Recarga la página; si sigue igual, falta ejecutar la actualización de la base de datos.</div><button type="button" className="btn-secondary btn-chico" onClick={() => window.location.reload()}>Recargar</button></div>
         )}
         <FranjaPlazo />
       <main id="contenido" className="contenido" data-dir={variante} tabIndex={-1} key={pathname.split('/').slice(0, 2).join('/')}><Outlet /></main>
-        <MovilBuscar onBuscar={() => setPaleta(true)} />
-        <MovilTabs onMas={() => setHoja('mas')} masActivo={rutasDeMas} />
+        <MovilTabs onMas={() => setHoja('mas')} masActivo={rutasDeMas} dashboard={dashboard} />
         <BienvenidaTour />
         <Toaster />
-        {hoja === 'mas' && <HojaMas grupos={grupos} navegar={navegar} sesion={sesion} onHoja={setHoja} onNombre={() => setCambiandoNombre(true)} onClave={() => setCambiandoClave(true)} onInstalar={() => window.dispatchEvent(new Event('tm:instalar'))} onCerrar={() => setHoja(null)} />}
+        {hoja === 'mas' && <HojaMas grupos={grupos} cuarto={dashboard} navegar={navegar} sesion={sesion} onHoja={setHoja} onNombre={() => setCambiandoNombre(true)} onClave={() => setCambiandoClave(true)} onInstalar={() => window.dispatchEvent(new Event('tm:instalar'))} onCerrar={() => setHoja(null)} />}
         {hoja === 'cuenta' && <HojaCuenta sesion={sesion} onCerrar={() => setHoja(null)} onNombre={() => setCambiandoNombre(true)} onClave={() => setCambiandoClave(true)} />}
         {crear && <CrearOverlay origen={crear} sesion={sesion} navegar={navegar} onHoja={setHoja} onCerrar={() => setCrear(null)} />}
         {(hoja === 'pendientes' || hoja === 'nocumplen') && <HojaIndicadores modo={hoja} navegar={navegar} onCerrar={() => setHoja(null)} />}

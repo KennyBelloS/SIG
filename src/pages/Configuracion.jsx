@@ -4,13 +4,15 @@ import { supabase } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
 import PageHeader from '../components/PageHeader';
 import { avisar } from '../lib/toast';
-import { crearUsuario, cambiarClaveDeUsuario, quitarUsuario, generarClave } from '../lib/usuarios';
+import { crearUsuario, crearAcceso, nuevoPinDeUsuario, cambiarClaveDeUsuario, quitarUsuario, generarClave, formatearPin } from '../lib/usuarios';
+import { normalizarIdentificador, etiquetaDeCorreo } from '../lib/acceso';
 import { traducirError } from '../lib/indicadores';
 import Dialogo, { Confirmar } from '../components/Dialogo';
 import {
   getProcesos, getIndicadores, actualizarIndicador, actualizarProceso, crearIndicador, desactivarIndicador, ROLES, formatearMetaMensual,
   getCierresDelAnio, reabrirMes, cerrarMes, enviarRecordatorioAhora, estaCerrado, mesVencido, verificarLogoCorreo,
   getConfiguracionNotificaciones, guardarConfiguracionNotificaciones, getHistorialNotificaciones, describirEnvio,
+  eliminarNotificacion, eliminarHistorialNotificaciones,
   mesReporteActual, MESES, MESES_CORTO, formatearMeta, esPorcentaje, entradaAValor, valorAEntrada,
 } from '../lib/indicadores';
 import FormularioIndicador from '../components/EditorIndicador';
@@ -263,6 +265,19 @@ function PestanaNotificaciones() {
   const [correoPrueba, setCorreoPrueba] = useState('');
   const [logo, setLogo] = useState(null);
   const [revisandoLogo, setRevisandoLogo] = useState(false);
+  const [porEliminarEnvio, setPorEliminarEnvio] = useState(null);   // null | { id } (uno) | { todo: true }
+  const [eliminandoEnvio, setEliminandoEnvio] = useState(false);
+
+  async function eliminarEnvios() {
+    if (!porEliminarEnvio) return;
+    setEliminandoEnvio(true);
+    try {
+      if (porEliminarEnvio.todo) { await eliminarHistorialNotificaciones(); setHistorial([]); avisar('Se eliminó todo el historial de envíos.', { tipo: 'ok' }); }
+      else { await eliminarNotificacion(porEliminarEnvio.id); setHistorial(h => h.filter(x => x.id !== porEliminarEnvio.id)); avisar('Envío eliminado.', { tipo: 'ok' }); }
+      setPorEliminarEnvio(null);
+    } catch (err) { avisar(traducirError(err), { tipo: 'error' }); }
+    finally { setEliminandoEnvio(false); }
+  }
 
   async function cargar() {
     try {
@@ -462,9 +477,12 @@ function PestanaNotificaciones() {
 
       {historial.length > 0 && (
         <section className="panel">
-          <div className="panel-header"><h2>Últimos envíos</h2></div>
+          <div className="panel-header">
+            <h2>Últimos envíos</h2>
+            <button type="button" className="btn-texto btn-peligro" onClick={() => setPorEliminarEnvio({ todo: true })}><i className="fa-solid fa-trash-can" aria-hidden="true"></i> Eliminar todo</button>
+          </div>
           <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte"><table>
-            <thead><tr><th>Fecha</th><th>Proceso</th><th>Tipo</th><th>Resultado</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Proceso</th><th>Tipo</th><th>Resultado</th><th><span className="sr-only">Eliminar</span></th></tr></thead>
             <tbody>
               {historial.map(h => (
                 <tr key={h.id}>
@@ -472,6 +490,7 @@ function PestanaNotificaciones() {
                   <td>{h.indicadores_procesos?.nombre || 'Todos'}</td>
                   <td>{h.modo}</td>
                   <td><span className={`chip-ind ${h.resultado === 'enviado' ? 'chip-ind-ok' : h.resultado === 'error' ? 'chip-ind-no' : 'chip-ind-pendiente'}`}>{h.resultado}</span></td>
+                  <td className="celda-acciones"><button type="button" className="btn-texto btn-peligro" onClick={() => setPorEliminarEnvio({ id: h.id })} aria-label="Eliminar este envío" title="Eliminar este envío"><i className="fa-solid fa-trash-can" aria-hidden="true"></i></button></td>
                 </tr>
               ))}
             </tbody>
@@ -485,23 +504,44 @@ function PestanaNotificaciones() {
           onConfirmar={() => probar(porEnviar)} onCancelar={() => setPorEnviar(null)}
         />
       )}
+      {porEliminarEnvio && (
+        <Confirmar
+          titulo={porEliminarEnvio.todo ? '¿Eliminar todo el historial de envíos?' : '¿Eliminar este envío?'}
+          texto={porEliminarEnvio.todo ? `Vas a eliminar ${historial.length} registro${historial.length === 1 ? '' : 's'} de envíos. No se puede deshacer.` : 'No se puede deshacer.'}
+          textoBoton="Eliminar" peligro cargando={eliminandoEnvio}
+          onConfirmar={eliminarEnvios} onCancelar={() => setPorEliminarEnvio(null)}
+        />
+      )}
     </>
   );
 }
 
+const TIPOS_ACCESO = [
+  { id: 'correo', icono: 'fa-envelope', titulo: 'Administrador o digitador', sub: 'Entra con correo y contraseña' },
+  { id: 'cedula', icono: 'fa-id-card', titulo: 'Usuario', sub: 'Entra con su cédula y un PIN' },
+  { id: 'usuario', icono: 'fa-helmet-safety', titulo: 'Ingeniero', sub: 'Entra con un usuario y un PIN' },
+];
+const ETIQUETA_ACCESO = { correo: 'Correo', cedula: 'Cédula', usuario: 'Usuario' };
+
 function PestanaUsuarios() {
   const { sesion } = useSesion();
   const [usuarios, setUsuarios] = useState([]);
+  const [procesos, setProcesos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [aviso, setAviso] = useState(null);
-  const [form, setForm] = useState({ nombre: '', email: '', password: '', rol: 'digitador' });
+  const [tipo, setTipo] = useState('correo');
+  const [form, setForm] = useState({ nombre: '', email: '', password: '', rol: 'digitador', cedula: '', usuario: '', procesos: [] });
+  const [usuarioTocado, setUsuarioTocado] = useState(false);
   const [creando, setCreando] = useState(false);
   const [errorForm, setErrorForm] = useState(null);
   const [creado, setCreado] = useState(null);       // datos de acceso que se muestran UNA vez
   const [copiado, setCopiado] = useState(false);
   const [paraClave, setParaClave] = useState(null); // usuario al que se le cambia la contraseña
+  const [paraPin, setParaPin] = useState(null);     // usuario (cédula / usuario) al que se le genera un PIN nuevo
+  const [paraProcesos, setParaProcesos] = useState(null);
   const [paraQuitar, setParaQuitar] = useState(null);
+  const etiqueta = u => etiquetaDeCorreo(u.email, u.tipo_acceso, u.identificador);
 
   async function cargar() {
     setCargando(true); setError(null);
@@ -511,14 +551,14 @@ function PestanaUsuarios() {
       setUsuarios(data || []);
     } catch (err) { setError(traducirError(err)); } finally { setCargando(false); }
   }
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { cargar(); getProcesos().then(p => setProcesos(p || [])).catch(() => {}); }, []);
 
   async function cambiarRol(u, rol) {
     setAviso(null); setError(null);
     try {
       const { error } = await supabase.from('indicadores_usuarios').update({ rol }).eq('user_id', u.user_id);
       if (error) throw error;
-      setAviso(`${u.email || 'La cuenta'} ahora es ${ROLES[rol].nombre}.`);
+      setAviso(`${etiqueta(u)} ahora es ${ROLES[rol].nombre}.`);
       avisar(`Rol actualizado: ${ROLES[rol].nombre}.`, { tipo: 'ok' });
       await cargar();
     } catch (err) { setError(traducirError(err)); }
@@ -536,18 +576,31 @@ function PestanaUsuarios() {
   }
   const yoMismo = u => u.user_id === sesion?.id;
 
+  function cambiarTipo(t) { setTipo(t); setErrorForm(null); setCreado(null); }
+  function escribirNombre(v) { setForm(f => ({ ...f, nombre: v, usuario: usuarioTocado ? f.usuario : (normalizarIdentificador('usuario', v) || '') })); }
+  const alternarProceso = id => setForm(f => ({ ...f, procesos: f.procesos.includes(id) ? f.procesos.filter(x => x !== id) : [...f.procesos, id] }));
+
   async function crear(e) {
     e.preventDefault();
     setErrorForm(null); setCreado(null); setCopiado(false);
-    const email = form.email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { setErrorForm('Escribe un correo válido.'); return; }
-    if (form.password.length < 8) { setErrorForm('La contraseña debe tener al menos 8 caracteres. Puedes generar una.'); return; }
     setCreando(true);
     try {
-      const r = await crearUsuario({ email, password: form.password, rol: form.rol, nombre: form.nombre });
-      setCreado({ email, password: r.adoptado ? null : form.password, rol: form.rol, adoptado: !!r.adoptado });
-      setForm({ nombre: '', email: '', password: '', rol: form.rol });
-      avisar(r.adoptado ? 'La cuenta ya existía: se agregó con su rol.' : 'Usuario creado.', { tipo: 'ok', celebrar: !r.adoptado });
+      if (tipo === 'correo') {
+        const email = form.email.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new Error('Escribe un correo válido.');
+        if (form.password.length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres. Puedes generar una.');
+        const r = await crearUsuario({ email, password: form.password, rol: form.rol, nombre: form.nombre });
+        setCreado({ tipo: 'correo', email, password: r.adoptado ? null : form.password, rol: form.rol, adoptado: !!r.adoptado });
+        avisar(r.adoptado ? 'La cuenta ya existía: se agregó con su rol.' : 'Usuario creado.', { tipo: 'ok', celebrar: !r.adoptado });
+      } else {
+        if (form.nombre.trim().length < 3) throw new Error('Escribe el nombre completo de la persona.');
+        const identificador = tipo === 'cedula' ? form.cedula : form.usuario;
+        if (!normalizarIdentificador(tipo, identificador)) throw new Error(tipo === 'cedula' ? 'Escribe la cédula solo con números (de 5 a 12 dígitos).' : 'El usuario debe tener de 3 a 30 caracteres: letras sin tilde, números, punto, guion o guion bajo.');
+        const r = await crearAcceso({ tipo, identificador, nombre: form.nombre.trim(), procesos: tipo === 'usuario' ? form.procesos : [] });
+        setCreado({ tipo, nombre: form.nombre.trim(), identificador: r.usuario.identificador, pin: r.pin, rol: r.usuario.rol });
+        avisar('Acceso creado. Copia el PIN: solo se muestra ahora.', { tipo: 'ok', celebrar: true });
+      }
+      setForm({ nombre: '', email: '', password: '', rol: form.rol, cedula: '', usuario: '', procesos: [] }); setUsuarioTocado(false);
       await cargar();
     } catch (err) { setErrorForm(err.message); } finally { setCreando(false); }
   }
@@ -557,7 +610,10 @@ function PestanaUsuarios() {
     catch { setCopiado(false); }
   }
 
-  const textoAcceso = c => `Sistema de Gestión de Finca Torremolinos\nCorreo: ${c.email}\nContraseña temporal: ${c.password}\nAl entrar, cámbiala desde tu nombre, arriba a la derecha.`;
+  const direccion = typeof window !== 'undefined' ? window.location.origin : '';
+  const textoAcceso = c => c.tipo === 'correo'
+    ? `Sistema de Gestión de Finca Torremolinos\nCorreo: ${c.email}\nContraseña temporal: ${c.password}\nAl entrar, cámbiala desde tu nombre, arriba a la derecha.`
+    : `Sistema de Gestión de Finca Torremolinos\n${c.tipo === 'cedula' ? 'Cédula' : 'Usuario'}: ${c.identificador}\nPIN: ${formatearPin(c.pin)}\nEntra en ${direccion} y elige «Cédula o usuario».`;
 
   return (
     <>
@@ -565,47 +621,87 @@ function PestanaUsuarios() {
         <div className="panel-header"><h2>Qué puede hacer cada rol</h2></div>
         <ul className="roles-lista">
           {Object.entries(ROLES).map(([k, r]) => (
-            <li key={k}><span className={`chip-ind ${k === 'admin' ? 'chip-ind-ok' : k === 'digitador' ? 'chip-ind-pendiente' : ''}`} style={k === 'usuario' ? { background: 'var(--line-soft)', color: 'var(--ink-2)' } : undefined}>{r.nombre}</span><p>{r.descripcion}</p></li>
+            <li key={k}><span className={`chip-ind ${k === 'admin' ? 'chip-ind-ok' : k === 'digitador' ? 'chip-ind-pendiente' : ''}`} style={k === 'usuario' || k === 'ingeniero' ? { background: 'var(--line-soft)', color: 'var(--ink-2)' } : undefined}>{r.nombre}</span> {r.descripcion}</li>
           ))}
         </ul>
       </section>
 
       <section className="panel" aria-labelledby="crear-usuario">
-        <div className="panel-header"><div><h2 id="crear-usuario">Crear usuario</h2><p className="sub">La cuenta queda lista para entrar de inmediato, con el rol que elijas.</p></div></div>
+        <div className="panel-header"><div><h2 id="crear-usuario">Crear acceso</h2><p className="sub">Elige cómo va a entrar la persona. Los PIN los genera la aplicación y se muestran una sola vez.</p></div></div>
+        <div className="tipos-acceso" role="radiogroup" aria-label="Cómo va a entrar">
+          {TIPOS_ACCESO.map(t => (
+            <button key={t.id} type="button" role="radio" aria-checked={tipo === t.id} className={`tipo-acceso${tipo === t.id ? ' activo' : ''}`} onClick={() => cambiarTipo(t.id)}>
+              <i className={`fa-solid ${t.icono}`} aria-hidden="true"></i><span><b>{t.titulo}</b><small>{t.sub}</small></span>
+            </button>
+          ))}
+        </div>
         <form className="form-usuario" onSubmit={crear} noValidate>
-          <label>Nombre <span className="texto-tenue">(opcional)</span>
-            <input type="text" name="nombre-nuevo" autoComplete="off" maxLength={90} placeholder="Nombre y apellido…" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
+          <label>Nombre {tipo === 'correo' && <span className="texto-tenue">(opcional)</span>}
+            <input type="text" name="nombre-nuevo" autoComplete="off" maxLength={90} placeholder="Nombre y apellido…" value={form.nombre} onChange={e => escribirNombre(e.target.value)} />
           </label>
-          <label>Correo
-            <input type="email" name="correo-nuevo" autoComplete="off" spellCheck={false} inputMode="email" placeholder="nombre@falconfarms.com.co…" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-          </label>
-          <label>Contraseña temporal
-            <span className="campo-clave">
-              <input type="text" name="clave-temporal" autoComplete="off" spellCheck={false} value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Mínimo 8 caracteres…" />
-              <button type="button" className="btn-secondary" onClick={() => setForm(f => ({ ...f, password: generarClave() }))}><i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Generar</button>
-            </span>
-          </label>
-          <label>Rol
-            <select value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value }))}>
-              {Object.entries(ROLES).map(([k, r]) => <option key={k} value={k}>{r.nombre}</option>)}
-            </select>
-            <small className="ayuda-campo">{ROLES[form.rol].descripcion}</small>
-          </label>
-          <div className="form-usuario-accion"><button type="submit" className="btn-primary" disabled={creando}>{creando ? 'Creando…' : 'Crear usuario'}</button></div>
+          {tipo === 'correo' && (
+            <>
+              <label>Correo
+                <input type="email" name="correo-nuevo" autoComplete="off" spellCheck={false} inputMode="email" placeholder="nombre@falconfarms.com.co…" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+              </label>
+              <label>Contraseña temporal
+                <span className="campo-clave">
+                  <input type="text" name="clave-temporal" autoComplete="off" spellCheck={false} value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Mínimo 8 caracteres…" />
+                  <button type="button" className="btn-secondary" onClick={() => setForm(f => ({ ...f, password: generarClave() }))}><i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Generar</button>
+                </span>
+              </label>
+              <label>Rol
+                <select value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value }))}>
+                  <option value="digitador">{ROLES.digitador.nombre}</option><option value="admin">{ROLES.admin.nombre}</option>
+                </select>
+                <small className="ayuda-campo">{ROLES[form.rol].descripcion}</small>
+              </label>
+            </>
+          )}
+          {tipo === 'cedula' && (
+            <label>Cédula
+              <input type="text" name="cedula-nueva" inputMode="numeric" autoComplete="off" placeholder="Solo números…" value={form.cedula} onChange={e => setForm(f => ({ ...f, cedula: e.target.value }))} />
+              <small className="ayuda-campo">La persona entra con esta cédula y un PIN de 6 dígitos que se genera al crear el acceso. Solo puede consultar.</small>
+            </label>
+          )}
+          {tipo === 'usuario' && (
+            <>
+              <label>Usuario
+                <input type="text" name="usuario-nuevo" autoComplete="off" spellCheck={false} autoCapitalize="none" placeholder="carlos.ramirez" value={form.usuario} onChange={e => { setUsuarioTocado(true); setForm(f => ({ ...f, usuario: e.target.value })); }} />
+                <small className="ayuda-campo">Se sugiere a partir del nombre. Letras sin tilde, números, punto, guion o guion bajo.</small>
+              </label>
+              <fieldset className="procesos-asignar">
+                <legend>Procesos que tiene a cargo <span className="texto-tenue">(opcional)</span></legend>
+                <div className="procesos-chips">
+                  {procesos.length === 0 && <span className="texto-tenue">Cargando procesos…</span>}
+                  {procesos.map(p => <button key={p.id} type="button" role="checkbox" aria-checked={form.procesos.includes(p.id)} className={`proceso-chip${form.procesos.includes(p.id) ? ' on' : ''}`} onClick={() => alternarProceso(p.id)}>{p.nombre}</button>)}
+                </div>
+              </fieldset>
+            </>
+          )}
+          <div className="form-usuario-accion"><button type="submit" className="btn-primary" disabled={creando}>{creando ? 'Creando…' : tipo === 'correo' ? 'Crear usuario' : 'Crear y generar PIN'}</button></div>
         </form>
         {errorForm && <div className="alert danger" role="alert" style={{ marginTop: 12 }}><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{errorForm}</span></div>}
         {creado && (
           <div className="acceso-creado" role="status">
-            <div className="acceso-creado-cab"><i className="fa-solid fa-circle-check" aria-hidden="true"></i><strong>{creado.adoptado ? 'La cuenta ya existía y quedó agregada' : 'Usuario creado'}</strong></div>
-            <dl>
-              <div><dt>Correo</dt><dd>{creado.email}</dd></div>
-              <div><dt>Rol</dt><dd>{ROLES[creado.rol].nombre}</dd></div>
-              {creado.password ? <div><dt>Contraseña temporal</dt><dd className="clave-visible">{creado.password}</dd></div> : <div><dt>Contraseña</dt><dd>La misma que ya tenía</dd></div>}
-            </dl>
-            {creado.password
-              ? <p className="ayuda-campo">Esta contraseña solo se muestra ahora. Entrégasela por un medio seguro; al entrar, la persona puede cambiarla desde su nombre, arriba a la derecha.</p>
-              : <p className="ayuda-campo">No se tocó su contraseña. Si no la recuerda, usa «Nueva contraseña» en la lista.</p>}
-            {creado.password && <button type="button" className="btn-secondary" onClick={() => copiar(textoAcceso(creado))}><i className={`fa-solid ${copiado ? 'fa-check' : 'fa-copy'}`} aria-hidden="true"></i> {copiado ? 'Copiado' : 'Copiar datos de acceso'}</button>}
+            <div className="acceso-creado-cab"><i className="fa-solid fa-circle-check" aria-hidden="true"></i><strong>{creado.adoptado ? 'La cuenta ya existía y quedó agregada' : creado.tipo === 'correo' ? 'Usuario creado' : `Acceso creado para ${creado.nombre}`}</strong></div>
+            {creado.tipo === 'correo' ? (
+              <dl>
+                <div><dt>Correo</dt><dd>{creado.email}</dd></div>
+                <div><dt>Rol</dt><dd>{ROLES[creado.rol].nombre}</dd></div>
+                {creado.password ? <div><dt>Contraseña temporal</dt><dd className="clave-visible">{creado.password}</dd></div> : <div><dt>Contraseña</dt><dd>La misma que ya tenía</dd></div>}
+              </dl>
+            ) : (
+              <>
+                <dl>
+                  <div><dt>{creado.tipo === 'cedula' ? 'Cédula' : 'Usuario'}</dt><dd>{creado.identificador}</dd></div>
+                  <div><dt>Rol</dt><dd>{ROLES[creado.rol].nombre}</dd></div>
+                </dl>
+                <p className="pin-grande" aria-label={`PIN ${creado.pin.split('').join(' ')}`}>{creado.pin.split('').map((d, i) => <span key={i} style={{ '--i': i }}>{d}</span>)}</p>
+              </>
+            )}
+            {(creado.password || creado.pin) && <p className="ayuda-campo">Este {creado.pin ? 'PIN' : 'dato'} solo se muestra ahora. Entrégaselo por un medio seguro{creado.pin ? '; si lo olvida, le generas uno nuevo desde la lista' : '; al entrar, la persona puede cambiarla desde su nombre'}.</p>}
+            {(creado.password || creado.pin) && <button type="button" className="btn-secondary" onClick={() => copiar(textoAcceso(creado))}><i className={`fa-solid ${copiado ? 'fa-check' : 'fa-copy'}`} aria-hidden="true"></i> {copiado ? 'Copiado' : 'Copiar los datos de acceso'}</button>}
           </div>
         )}
       </section>
@@ -616,26 +712,39 @@ function PestanaUsuarios() {
         {aviso && <div className="aviso aviso-ok" role="status"><i className="fa-solid fa-circle-check" aria-hidden="true"></i><span>{aviso}</span></div>}
         {cargando ? <Cargando filas={4} /> : (
           <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte"><table className="tabla-apilable">
-            <thead><tr><th>Persona</th><th>Rol</th><th><span className="sr-only">Acciones</span></th></tr></thead>
+            <thead><tr><th>Persona</th><th>Entra con</th><th>Rol</th><th><span className="sr-only">Acciones</span></th></tr></thead>
             <tbody>
-              {usuarios.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Todavía no hay usuarios. Crea el primero arriba.</td></tr>}
+              {usuarios.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Todavía no hay usuarios. Crea el primero arriba.</td></tr>}
               {usuarios.map(u => {
-                const yo = u.email && u.email === sesion?.email;
+                const yo = u.user_id === sesion?.id;
+                const porPin = (u.tipo_acceso || 'correo') !== 'correo';
+                const asignados = (u.procesos || []).map(id => procesos.find(p => p.id === id)?.nombre).filter(Boolean);
                 return (
                   <tr key={u.user_id}>
                     <td className="celda-principal">
-                      <input className="nombre-en-linea" aria-label={`Nombre de ${u.email || u.user_id}`} defaultValue={u.nombre || ''} maxLength={90} placeholder="Sin nombre" key={`${u.user_id}-${u.nombre || ''}`}
+                      <input className="nombre-en-linea" aria-label={`Nombre de ${etiqueta(u)}`} defaultValue={u.nombre || ''} maxLength={90} placeholder="Sin nombre" key={`${u.user_id}-${u.nombre || ''}`}
                         onBlur={e => { const v = e.target.value.trim(); if (v !== (u.nombre || '')) cambiarNombreDe(u, v); }} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
-                      <small className="texto-tenue" translate="no">{u.email || u.user_id}{yo && ' (tú)'}</small>
+                      <small className="texto-tenue" translate="no">{etiqueta(u)}{yo && ' (tú)'}</small>
                     </td>
+                    <td data-label="Entra con"><span className="chip-acceso">{ETIQUETA_ACCESO[u.tipo_acceso || 'correo']}</span></td>
                     <td data-label="Rol">
-                      <select aria-label={`Rol de ${u.email || u.user_id}`} value={u.rol} disabled={yo} title={yo ? 'No puedes cambiar tu propio rol para no quedarte sin acceso' : undefined} onChange={e => cambiarRol(u, e.target.value)}>
-                        {Object.entries(ROLES).map(([k, r]) => <option key={k} value={k}>{r.nombre}</option>)}
-                      </select>
+                      {porPin ? (
+                        <>
+                          <span className="chip-ind" style={{ background: 'var(--line-soft)', color: 'var(--ink-2)' }}>{ROLES[u.rol]?.nombre || u.rol}</span>
+                          {u.rol === 'ingeniero' && <small className="texto-tenue procesos-resumen">{asignados.length ? asignados.join(' · ') : 'Sin procesos asignados'}</small>}
+                        </>
+                      ) : (
+                        <select aria-label={`Rol de ${etiqueta(u)}`} value={u.rol} disabled={yo} title={yo ? 'No puedes cambiar tu propio rol para no quedarte sin acceso' : undefined} onChange={e => cambiarRol(u, e.target.value)}>
+                          {['admin', 'digitador', 'ingeniero', 'usuario'].filter(k => k === u.rol || k === 'admin' || k === 'digitador').map(k => <option key={k} value={k}>{ROLES[k].nombre}</option>)}
+                        </select>
+                      )}
                     </td>
                     <td data-label="Acciones" className="celda-acciones">
-                      <button type="button" className="btn-texto" onClick={() => setParaClave(u)} disabled={yo} title={yo ? 'Cambia tu contraseña desde tu nombre, arriba a la derecha' : undefined}><i className="fa-solid fa-key" aria-hidden="true"></i> Nueva contraseña<span className="sr-only"> de {u.email}</span></button>
-                      <button type="button" className="btn-texto btn-peligro" onClick={() => setParaQuitar(u)} disabled={yo} title={yo ? 'No puedes quitarte el acceso a ti mismo' : undefined}><i className="fa-solid fa-user-xmark" aria-hidden="true"></i> Quitar acceso<span className="sr-only"> a {u.email}</span></button>
+                      {u.rol === 'ingeniero' && <button type="button" className="btn-texto" onClick={() => setParaProcesos(u)}><i className="fa-solid fa-diagram-project" aria-hidden="true"></i> Procesos</button>}
+                      {porPin
+                        ? <button type="button" className="btn-texto" onClick={() => setParaPin(u)}><i className="fa-solid fa-key" aria-hidden="true"></i> Nuevo PIN</button>
+                        : <button type="button" className="btn-texto" onClick={() => setParaClave(u)} disabled={yo} title={yo ? 'Cambia tu contraseña desde tu nombre, arriba a la derecha' : undefined}><i className="fa-solid fa-key" aria-hidden="true"></i> Nueva contraseña</button>}
+                      <button type="button" className="btn-texto btn-peligro" onClick={() => setParaQuitar(u)} disabled={yo} title={yo ? 'No puedes quitarte el acceso a ti mismo' : undefined}><i className="fa-solid fa-user-xmark" aria-hidden="true"></i> Quitar acceso</button>
                     </td>
                   </tr>
                 );
@@ -646,16 +755,78 @@ function PestanaUsuarios() {
       </section>
 
       {paraClave && <NuevaClaveDialogo usuario={paraClave} onCerrar={() => setParaClave(null)} />}
+      {paraPin && <NuevoPinDialogo usuario={paraPin} etiqueta={etiqueta(paraPin)} direccion={direccion} onCerrar={() => setParaPin(null)} />}
+      {paraProcesos && <ProcesosDialogo usuario={paraProcesos} procesos={procesos} onCerrar={() => setParaProcesos(null)} onGuardado={async () => { setParaProcesos(null); await cargar(); }} />}
       {paraQuitar && (
-        <Confirmar titulo={`¿Quitar el acceso a ${paraQuitar.email}?`} peligro textoBoton="Quitar acceso"
+        <Confirmar titulo={`¿Quitar el acceso a ${paraQuitar.nombre || etiqueta(paraQuitar)}?`} peligro textoBoton="Quitar acceso"
           texto="La persona ya no podrá entrar a la aplicación y su cuenta se borra. Los datos que registró se conservan. Esta acción no se puede deshacer."
           onCancelar={() => setParaQuitar(null)}
           onConfirmar={async () => {
-            try { await quitarUsuario({ user_id: paraQuitar.user_id }); avisar('Acceso quitado.', { tipo: 'ok' }); setAviso(`Se quitó el acceso a ${paraQuitar.email}.`); await cargar(); }
+            try { await quitarUsuario({ user_id: paraQuitar.user_id }); avisar('Acceso quitado.', { tipo: 'ok' }); setAviso(`Se quitó el acceso a ${paraQuitar.nombre || etiqueta(paraQuitar)}.`); await cargar(); }
             catch (err) { setError(err.message); } finally { setParaQuitar(null); }
           }} />
       )}
     </>
+  );
+}
+
+/** Un PIN nuevo para quien entra con cédula o con usuario: se genera al confirmar y se muestra una sola vez. */
+function NuevoPinDialogo({ usuario, etiqueta, direccion, onCerrar }) {
+  const [pin, setPin] = useState(null);
+  const [error, setError] = useState(null);
+  const [generando, setGenerando] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+  async function generar() {
+    setGenerando(true); setError(null);
+    try { const r = await nuevoPinDeUsuario({ user_id: usuario.user_id }); setPin(r.pin); avisar('PIN nuevo generado.', { tipo: 'ok' }); }
+    catch (err) { setError(err.message); } finally { setGenerando(false); }
+  }
+  const texto = `Sistema de Gestión de Finca Torremolinos\n${usuario.tipo_acceso === 'cedula' ? 'Cédula' : 'Usuario'}: ${usuario.identificador}\nPIN nuevo: ${formatearPin(pin)}\nEntra en ${direccion} y elige «Cédula o usuario».`;
+  async function copiar() { try { await navigator.clipboard.writeText(texto); setCopiado(true); setTimeout(() => setCopiado(false), 2500); } catch { setCopiado(false); } }
+  return (
+    <Dialogo titulo="Nuevo PIN" onCerrar={onCerrar} ancho={480}>
+      <div className="form-dialogo">
+        <h2>Nuevo PIN</h2>
+        <p style={{ marginTop: -6 }}>Para <strong>{usuario.nombre || etiqueta}</strong> ({etiqueta}).</p>
+        {!pin ? (
+          <>
+            <p className="ayuda-campo">El PIN anterior deja de servir en el momento. Se genera uno nuevo de 6 dígitos y solo se muestra una vez.</p>
+            {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+            <div className="ind-modal-acciones"><button type="button" className="btn-secondary" onClick={onCerrar}>Cancelar</button><button type="button" className="btn-primary" onClick={generar} disabled={generando}>{generando ? 'Generando…' : 'Generar PIN nuevo'}</button></div>
+          </>
+        ) : (
+          <>
+            <div className="aviso aviso-ok" role="status" style={{ marginTop: 0 }}><i className="fa-solid fa-circle-check" aria-hidden="true"></i><span>PIN cambiado. Solo se muestra ahora:</span></div>
+            <p className="pin-grande" aria-label={`PIN ${pin.split('').join(' ')}`}>{pin.split('').map((d, i) => <span key={i} style={{ '--i': i }}>{d}</span>)}</p>
+            <div className="ind-modal-acciones"><button type="button" className="btn-secondary" onClick={copiar}><i className={`fa-solid ${copiado ? 'fa-check' : 'fa-copy'}`} aria-hidden="true"></i> {copiado ? 'Copiado' : 'Copiar los datos'}</button><button type="button" className="btn-primary" onClick={onCerrar}>Listo</button></div>
+          </>
+        )}
+      </div>
+    </Dialogo>
+  );
+}
+
+/** Los procesos que tiene a cargo un ingeniero. */
+function ProcesosDialogo({ usuario, procesos, onCerrar, onGuardado }) {
+  const [sel, setSel] = useState(usuario.procesos || []);
+  const [error, setError] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  const alternar = id => setSel(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]));
+  async function guardar() {
+    setGuardando(true); setError(null);
+    try { const { error } = await supabase.from('indicadores_usuarios').update({ procesos: sel }).eq('user_id', usuario.user_id); if (error) throw error; avisar('Procesos asignados.', { tipo: 'ok' }); await onGuardado(); }
+    catch (err) { setError(traducirError(err)); setGuardando(false); }
+  }
+  return (
+    <Dialogo titulo="Procesos del ingeniero" onCerrar={onCerrar} ancho={520}>
+      <div className="form-dialogo">
+        <h2>Procesos a cargo</h2>
+        <p style={{ marginTop: -6 }}>De <strong>{usuario.nombre || usuario.identificador}</strong>. Los verá primero en su inicio.</p>
+        <div className="procesos-chips">{procesos.map(p => <button key={p.id} type="button" role="checkbox" aria-checked={sel.includes(p.id)} className={`proceso-chip${sel.includes(p.id) ? ' on' : ''}`} onClick={() => alternar(p.id)}>{p.nombre}</button>)}</div>
+        {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+        <div className="ind-modal-acciones"><button type="button" className="btn-secondary" onClick={onCerrar}>Cancelar</button><button type="button" className="btn-primary" onClick={guardar} disabled={guardando}>{guardando ? 'Guardando…' : 'Guardar'}</button></div>
+      </div>
+    </Dialogo>
   );
 }
 

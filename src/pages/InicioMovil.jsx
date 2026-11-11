@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { rolDeAyuda } from '../lib/acceso';
+import { useCallback, useEffect, useState } from 'react';
+import { useDatosVivos } from '../lib/actualizacion';
 import { useNavigate } from 'react-router-dom';
 import CartaDesplegable from '../components/vida/CartaDesplegable';
 import TourDispositivo from '../components/vida/TourDispositivo';
+import ResumenVivo from '../components/vida/ResumenVivo';
 import { useSesion } from '../lib/useSesion';
 import { useMovil } from '../lib/movil';
 import { getResumenMes, mesReporteActual, traducirError, MESES } from '../lib/indicadores';
@@ -20,7 +23,9 @@ export default function InicioMovil() {
   const [carta, setCarta] = useState(null);
   const navegar = useNavigate();
   const { anio, mesActual } = mesReporteActual();
-  useEffect(() => { getResumenMes(anio, mesActual).then(setD).catch(e => setError(traducirError(e))); }, [anio, mesActual]);
+  const cargar = useCallback(() => getResumenMes(anio, mesActual).then(x => { setD(x); setError(null); }), [anio, mesActual]);
+  useEffect(() => { cargar().catch(e => setError(traducirError(e))); }, [cargar]);
+  useDatosVivos(() => { cargar().catch(() => { /* se queda lo que ya se ve */ }); });
 
   const hoy = new Date();
   const restan = d ? d.diaCierre - hoy.getDate() : null;
@@ -28,6 +33,21 @@ export default function InicioMovil() {
   const evaluados = t ? t.cumplen + t.noCumplen : 0;
   const pct = evaluados ? Math.round((t.cumplen / evaluados) * 100) : null;
   const primero = sesion?.nombre ? sesion.nombre.split(/\s+/)[0] : null;
+
+  // lo que el colibrí va llevando al escenario: lo mismo para todos los roles
+  const itemsVivos = !d ? [] : (() => {
+    const evalP = d.porProceso.filter(p => p.cumplen + p.noCumplen > 0).map(p => ({ ...p, pct: Math.round((100 * p.cumplen) / (p.cumplen + p.noCumplen)) }));
+    const mejor = [...evalP].sort((a, b) => b.pct - a.pct)[0];
+    const aten = [...d.porProceso].sort((a, b) => (b.noCumplen * 2 + b.pendientes) - (a.noCumplen * 2 + a.pendientes))[0];
+    return [
+      { id: 'cumpl', icono: 'fa-bullseye', titulo: 'Cumplimiento', valor: pct == null ? '—' : `${pct}%`, texto: evaluados ? `${t.cumplen} de ${evaluados} indicadores registrados cumplen su meta` : 'Todavía no hay resultados este mes', tono: pct == null ? 'neutro' : pct >= 85 ? 'bien' : pct >= 60 ? 'aten' : 'mal' },
+      mejor && { id: 'mejor', icono: 'fa-trophy', titulo: 'Mejor proceso', valor: mejor.nombre, texto: `${mejor.pct}% de sus indicadores cumple su meta`, tono: 'bien' },
+      aten && (aten.noCumplen || aten.pendientes) ? { id: 'aten', icono: 'fa-triangle-exclamation', titulo: 'Pide atención', valor: aten.nombre, texto: `${aten.noCumplen} no cumplen · ${aten.pendientes} por registrar`, tono: 'mal' } : null,
+      { id: 'falta', icono: 'fa-list-check', titulo: 'Por registrar', valor: String(t.pendientes), texto: t.pendientes ? 'indicadores esperan su dato de este mes' : 'Todo está registrado', tono: t.pendientes ? 'aten' : 'bien' },
+      { id: 'plan', icono: 'fa-clipboard-list', titulo: 'Sin plan de acción', valor: String(t.sinPlan), texto: t.sinPlan ? 'no cumplen y necesitan un plan de acción' : 'Todos los que no cumplen tienen plan', tono: t.sinPlan ? 'mal' : 'bien' },
+      { id: 'plazo', icono: 'fa-hourglass-half', titulo: 'Plazo', valor: d.cerrado ? 'Cerrado' : `${Math.max(0, restan)} ${restan === 1 ? 'día' : 'días'}`, texto: d.cerrado ? `${MESES[mesActual - 1]} ya está cerrado` : `para registrar ${MESES[mesActual - 1].toLowerCase()}`, tono: d.cerrado ? 'mal' : restan <= 2 ? 'aten' : 'bien' },
+    ].filter(Boolean);
+  })();
 
   return (
     <div className="page inicio-movil">
@@ -39,7 +59,7 @@ export default function InicioMovil() {
       {!d && !error && <Cargando filas={3} alto={120} />}
       {d && (
         <>
-          <section className="im-tira" aria-label="Lo más importante del mes: desliza hacia los lados" tabIndex={0}>
+          <section className="im-tira" aria-label="Lo más importante del mes">
             <article className={`im-carta ${d.cerrado ? 'tono-mal' : restan <= 2 ? 'tono-aten' : 'tono-bien'}`}>
               <small>{d.cerrado ? 'Plazo' : 'Quedan'}</small>
               <strong>{d.cerrado ? <i className="fa-solid fa-lock" aria-hidden="true"></i> : <Numero valor={Math.max(0, restan)} />}</strong>
@@ -66,10 +86,20 @@ export default function InicioMovil() {
             </article>
           </section>
 
-          <section className="inicio-demo" aria-labelledby="im-asi">
-            <div className="im-seccion-cab"><h2 className="im-titulo" id="im-asi">Así funciona</h2><button type="button" className="btn-texto" onClick={() => window.dispatchEvent(new Event('indicadores:tour'))}><i className="fa-solid fa-expand" aria-hidden="true"></i> Verlo en pantalla completa</button></div>
-            <TourDispositivo rol={sesion?.rol || 'usuario'} compacto />
-          </section>
+          <section className="im-vivo" aria-label="Resumen vivo"><ResumenVivo items={itemsVivos} titulo="Resumen vivo" /></section>
+
+          {movil ? (
+            <button type="button" className="im-asi-tarjeta" onClick={() => window.dispatchEvent(new Event('indicadores:tour'))}>
+              <span className="im-asi-ico"><i className="fa-solid fa-circle-play" aria-hidden="true"></i></span>
+              <span className="im-asi-txt"><strong>Así funciona</strong><small>Un recorrido animado de cada pantalla, en pantalla completa</small></span>
+              <i className="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </button>
+          ) : (
+            <section className="inicio-demo" aria-labelledby="im-asi">
+              <div className="im-seccion-cab"><h2 className="im-titulo" id="im-asi">Así funciona</h2><button type="button" className="btn-texto" onClick={() => window.dispatchEvent(new Event('indicadores:tour'))}><i className="fa-solid fa-expand" aria-hidden="true"></i> Verlo en pantalla completa</button></div>
+              <TourDispositivo rol={rolDeAyuda(sesion?.rol)} compacto />
+            </section>
+          )}
 
           <h2 className="im-titulo">Tus procesos</h2>
           {d.porProceso.length === 0 && <div className="estado-vacio"><i className="fa-solid fa-seedling" aria-hidden="true"></i><h3>Todavía no hay indicadores</h3><p>Cuando un administrador los cree, aparecerán aquí.</p></div>}

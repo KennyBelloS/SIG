@@ -7,8 +7,7 @@ export const movimientoActual = () => document.documentElement.dataset.movimient
 export function aplicarLetra(n) { document.documentElement.dataset.letra = n; guardar(L, n); window.dispatchEvent(new Event('tm:preferencias')); }
 export function aplicarMovimiento(m) { document.documentElement.dataset.movimiento = m; guardar(M, m); window.dispatchEvent(new Event('tm:preferencias')); }
 export function iniciarPreferencias() {
-  const estrecha = window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
-  document.documentElement.dataset.letra = leer(L) || (estrecha ? 'grande' : 'normal');   // en el celular la letra arranca más grande
+  document.documentElement.dataset.letra = leer(L) || 'normal';   // en el celular «normal» ya es más chica que en el computador (ver vida.css)   // en el celular la letra arranca más grande
   document.documentElement.dataset.movimiento = leer(M) === 'reducido' ? 'reducido' : 'auto';
 }
 /** ¿Hay que evitar el movimiento? Sí si la persona lo pidió aquí o si su equipo lo pide. */

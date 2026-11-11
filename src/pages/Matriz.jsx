@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useDatosVivos } from '../lib/actualizacion';
 import { Link, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import MatrizExcel from './MatrizExcel';
@@ -42,15 +43,12 @@ function MatrizSeguimiento({ selectorVista }) {
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    let vivo = true;
-    setDatos(null); setError(null);
-    Promise.all([getIndicadores(), getProcesos(), supabaseRegistrosAnio(anio), getCierresDelAnio(anio),
-      getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 15 }))])
-      .then(([indicadores, procesos, registros, cierres, cfg]) => vivo && setDatos({ indicadores, procesos, registros, cierres, diaCierre: cfg?.dia_cierre ?? 15 }))
-      .catch(e => vivo && setError(traducirError(e)));
-    return () => { vivo = false; };
-  }, [anio]);
+  const cargar = useCallback(() => Promise.all([getIndicadores(), getProcesos(), supabaseRegistrosAnio(anio), getCierresDelAnio(anio),
+    getConfiguracionNotificaciones().catch(() => ({ dia_cierre: 15 }))])
+    .then(([indicadores, procesos, registros, cierres, cfg]) => { setDatos({ indicadores, procesos, registros, cierres, diaCierre: cfg?.dia_cierre ?? 15 }); setError(null); }), [anio]);
+  useEffect(() => { setDatos(null); setError(null); cargar().catch(e => setError(traducirError(e))); }, [cargar]);
+  // la Matriz se va poniendo al día con lo que se guarda en los indicadores, sin recargar la página (y sin parpadear)
+  useDatosVivos(() => { cargar().catch(() => { /* si falla un refresco silencioso, se queda lo que ya se ve */ }); });
 
   const filas = useMemo(() => {
     if (!datos) return [];

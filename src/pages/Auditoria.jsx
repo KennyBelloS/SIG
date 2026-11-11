@@ -1,7 +1,11 @@
+import { etiquetaDeCorreo } from '../lib/acceso';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import Cargando from '../components/Cargando';
+import Dialogo from '../components/Dialogo';
 import { avisar } from '../lib/toast';
+import { supabase } from '../lib/supabaseClient';
+import { proximaDepuracion } from '../lib/depuracion';
 import { getAuditoria, getPresencia, getAlmacenamiento, guardarLimiteAlmacenamiento, traducirError } from '../lib/indicadores';
 
 const TIPOS = {
@@ -37,7 +41,7 @@ function hace(iso) {
 const exacta = iso => new Date(iso).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
 const desdeISO = clave => { if (clave === 'todo') return null; const d = new Date(); if (clave === 'hoy') d.setHours(0, 0, 0, 0); else d.setDate(d.getDate() - Number(clave)); return d.toISOString(); };
 const mb = b => (b / 1048576).toLocaleString('es-CO', { maximumFractionDigits: b < 1048576 * 10 ? 2 : 1 });
-const quien = e => e.nombre || e.email || 'Alguien';
+const quien = e => e.nombre || etiquetaDeCorreo(e.email) || 'Alguien';
 function valorLegible(v) {
   if (v == null || v === '') return '—';
   if (typeof v === 'boolean') return v ? 'Sí' : 'No';
@@ -90,18 +94,7 @@ function Actividad({ periodo, setPeriodo }) {
   const personas = useMemo(() => [...new Set((datos || []).map(e => e.email).filter(Boolean))].sort(), [datos]);
   const vistos = useMemo(() => (datos || []).filter(e => (persona === 'todas' || e.email === persona) && (!texto.trim() || `${e.resumen} ${e.email} ${e.nombre || ''}`.toLowerCase().includes(texto.trim().toLowerCase()))), [datos, persona, texto]);
 
-  const limpieza = (() => {
-    const NOM = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-    const hoy = new Date(), faltan = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate() - hoy.getDate() + 1;
-    return { faltan, texto: `La de ${NOM[hoy.getMonth()]} se borrará el 1 de ${NOM[(hoy.getMonth() + 1) % 12]}${faltan <= 5 ? ` (${faltan === 1 ? 'mañana' : `en ${faltan} días`})` : ''}; solo se conserva la del mes en curso. Si la necesitas, descárgala en Excel antes.` };
-  })();
-  async function descargar() {
-    const { default: escribir } = await import('write-excel-file/browser');
-    const cab = ['Fecha', 'Persona', 'Correo', 'Clase', 'Acción', 'Detalle'].map(v => ({ value: v, fontWeight: 'bold' }));
-    const filas = vistos.map(e => [e.creado_en ? exacta(e.creado_en) : '', e.nombre || '', e.email || '', (TIPOS[e.tipo] || {}).texto || e.tipo, e.accion, e.resumen].map(v => ({ value: v == null ? '' : String(v), type: String })));
-    await escribir([cab, ...filas], { columns: [{ width: 22 }, { width: 24 }, { width: 30 }, { width: 16 }, { width: 12 }, { width: 70 }] })
-      .toFile(`bitacora-${new Date().toISOString().slice(0, 10)}.xlsx`);
-  }
+  const descargar = () => exportarBitacora(vistos);
 
   return (
     <>
@@ -111,11 +104,6 @@ function Actividad({ periodo, setPeriodo }) {
         <label>Periodo<select value={periodo} onChange={e => setPeriodo(e.target.value)}>{PERIODOS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></label>
         <label className="aud-buscar">Buscar<input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Un indicador, una persona…" /></label>
         <button type="button" className="btn-secondary" onClick={descargar} disabled={!vistos.length}><i className="fa-solid fa-file-excel" aria-hidden="true"></i> Descargar Excel</button>
-      </div>
-      <div className="aud-limpieza" role="note">
-        <i className="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
-        <div><strong>La actividad se elimina cada mes.</strong> <span>{limpieza.texto}</span></div>
-        <button type="button" className="btn-secondary" onClick={descargar} disabled={!vistos.length}><i className="fa-solid fa-file-excel" aria-hidden="true"></i> Descargar antes</button>
       </div>
       {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
       <section className="panel" aria-labelledby="aud-titulo">
@@ -153,7 +141,7 @@ function Accesos({ periodo, setPeriodo }) {
         ) : (
           <ul className="aud-linea">{enLinea.map(p => (
             <li key={p.user_id}><span className="aud-avatar" aria-hidden="true">{(p.nombre || p.email || '?').trim()[0].toUpperCase()}</span>
-              <div><strong translate="no">{p.nombre || p.email}</strong>{p.nombre && <small translate="no">{p.email}</small>}<small>Está en <b>{pantalla(p.pantalla)}</b>, activo {hace(p.ultima_actividad)}</small></div></li>
+              <div><strong translate="no">{p.nombre || etiquetaDeCorreo(p.email)}</strong>{p.nombre && <small translate="no">{etiquetaDeCorreo(p.email)}</small>}<small>Está en <b>{pantalla(p.pantalla)}</b>, activo {hace(p.ultima_actividad)}</small></div></li>
           ))}</ul>
         )}
       </section>
@@ -247,11 +235,98 @@ function Espacio({ onDatos }) {
   );
 }
 
+async function exportarBitacora(eventos, prefijo = 'bitacora') {
+  const { default: escribir } = await import('write-excel-file/browser');
+  const cab = ['Fecha', 'Persona', 'Correo', 'Clase', 'Acción', 'Detalle'].map(v => ({ value: v, fontWeight: 'bold' }));
+  const filas = eventos.map(e => [e.creado_en ? exacta(e.creado_en) : '', e.nombre || '', etiquetaDeCorreo(e.email) || '', (TIPOS[e.tipo] || {}).texto || e.tipo, e.accion, e.resumen].map(v => ({ value: v == null ? '' : String(v), type: String })));
+  await escribir([cab, ...filas], { columns: [{ width: 22 }, { width: 24 }, { width: 30 }, { width: 16 }, { width: 12 }, { width: 70 }] })
+    .toFile(`${prefijo}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+const MODOS = {
+  accesos: { boton: 'Eliminar accesos', que: 'los accesos (quién entró y salió)', icono: 'fa-door-open' },
+  actividad: { boton: 'Eliminar actividad', que: 'la actividad (quién cambió qué)', icono: 'fa-clock-rotate-left' },
+  todo: { boton: 'Eliminar todo', que: 'los accesos y la actividad', icono: 'fa-trash-can' },
+};
+
+/** Eliminación de la bitácora: la automática (primer martes del mes, con aviso y 2 días para cancelar) y la manual por tipo. */
+function PanelLimpieza({ onBorrado }) {
+  const plan = useMemo(() => proximaDepuracion(), []);
+  const [cfg, setCfg] = useState(null);
+  const [dlg, setDlg] = useState(null);
+  const [trabajando, setTrabajando] = useState(false);
+  const cargar = useCallback(async () => {
+    try { const { data } = await supabase.from('indicadores_configuracion').select('depuracion_objetivo,depuracion_aviso_en,depuracion_cancelada').eq('id', 1).maybeSingle(); setCfg(data || {}); } catch { setCfg({}); }
+  }, []);
+  useEffect(() => { cargar(); }, [cargar]);
+  const cancelada = !!cfg?.depuracion_cancelada;
+  useEffect(() => { try { localStorage.setItem(`tm:dep-cancelada:${plan.iso}`, cancelada ? '1' : '0'); } catch { /* nada */ } }, [cancelada, plan.iso]);
+  const enPlazo = plan.faltan >= 0 && plan.faltan <= 5;
+
+  async function alternar() {
+    setTrabajando(true);
+    try { const { error } = await supabase.rpc('indicadores_depuracion_cancelar', { p_cancelar: !cancelada }); if (error) throw error; await cargar(); avisar(cancelada ? 'La eliminación automática quedó activa otra vez.' : 'Listo: este mes no se eliminará nada.', { tipo: 'ok' }); }
+    catch (e) { avisar(traducirError(e), { tipo: 'error' }); } finally { setTrabajando(false); }
+  }
+  async function abrir(modo) {
+    try {
+      let q = supabase.from('indicadores_auditoria').select('id', { count: 'exact', head: true }).neq('accion', 'depurar');
+      if (modo === 'accesos') q = q.eq('tipo', 'acceso'); else if (modo === 'actividad') q = q.neq('tipo', 'acceso');
+      const { count } = await q; setDlg({ modo, cuantos: count ?? 0 });
+    } catch { setDlg({ modo, cuantos: null }); }
+  }
+  async function descargarAntes() {
+    try { const filas = await getAuditoria({ soloAccesos: dlg.modo === 'accesos', limite: 20000 }); await exportarBitacora(dlg.modo === 'accesos' ? filas : dlg.modo === 'actividad' ? filas : [...filas, ...(await getAuditoria({ soloAccesos: true, limite: 20000 }))], `bitacora-${dlg.modo}`); }
+    catch (e) { avisar(traducirError(e), { tipo: 'error' }); }
+  }
+  async function confirmar() {
+    setTrabajando(true);
+    try {
+      const { data, error } = await supabase.rpc('indicadores_depurar_bitacora', { p_modo: dlg.modo }); if (error) throw error;
+      avisar(`Se eliminaron ${data?.eliminados ?? 0} registros de ${MODOS[dlg.modo].que}.`, { tipo: 'ok' }); setDlg(null); onBorrado();
+    } catch (e) { avisar(traducirError(e), { tipo: 'error' }); } finally { setTrabajando(false); }
+  }
+
+  const estado = cancelada ? 'cancelada' : enPlazo ? 'plazo' : 'lejos';
+  return (
+    <section className={`aud-limpieza ${estado}`} aria-label="Eliminación de la bitácora">
+      <div className="aud-limpieza-cab">
+        <i className={`fa-solid ${estado === 'cancelada' ? 'fa-ban' : 'fa-clock-rotate-left'}`} aria-hidden="true"></i>
+        <div>
+          {estado === 'cancelada' && <><strong>Cancelaste la eliminación del {plan.texto}.</strong> <span>El mes siguiente se vuelve a programar sola.</span></>}
+          {estado === 'plazo' && <><strong>{plan.faltan === 0 ? 'Hoy' : `El ${plan.texto}`} se eliminan los accesos y la actividad.</strong> <span>{plan.faltan >= 2 ? `Tienes ${plan.faltan - 1} ${plan.faltan - 1 === 1 ? 'día' : 'días'} para cancelarlo.` : 'Cancélalo ahora si no quieres que se borre.'} Si el aviso llega con menos de 2 días, ese mes no se borra nada.</span></>}
+          {estado === 'lejos' && <><strong>Cada primer martes del mes se eliminan los accesos y la actividad.</strong> <span>La próxima vez será el {plan.texto}. Te aviso 5 días antes y tienes 2 días para cancelarla.</span></>}
+        </div>
+        {(estado === 'plazo' || estado === 'cancelada') && <button type="button" className={estado === 'plazo' ? 'btn-primary' : 'btn-secondary'} onClick={alternar} disabled={trabajando}>{estado === 'plazo' ? 'Cancelar la eliminación' : 'Volver a activarla'}</button>}
+      </div>
+      <div className="aud-limpieza-acc" role="group" aria-label="Eliminar a mano">
+        <span>Eliminar a mano:</span>
+        {Object.entries(MODOS).map(([k, m]) => <button key={k} type="button" className="btn-secondary btn-chico" onClick={() => abrir(k)}><i className={`fa-solid ${m.icono}`} aria-hidden="true"></i> {m.boton}</button>)}
+      </div>
+      {dlg && (
+        <Dialogo titulo={MODOS[dlg.modo].boton} onCerrar={() => setDlg(null)} ancho={480}>
+          <div className="form-dialogo">
+            <h2>{MODOS[dlg.modo].boton}</h2>
+            <p>Vas a eliminar {dlg.cuantos == null ? '' : <strong>{dlg.cuantos.toLocaleString('es-CO')} registros de </strong>}{MODOS[dlg.modo].que}. <strong>No se puede deshacer.</strong> Queda anotado quién lo hizo.</p>
+            <p className="sub">Si quieres conservarlos, descárgalos en Excel antes.</p>
+            <div className="acciones-dialogo">
+              <button type="button" className="btn-secondary" onClick={descargarAntes}><i className="fa-solid fa-file-excel" aria-hidden="true"></i> Descargar antes</button>
+              <button type="button" className="btn-secondary" onClick={() => setDlg(null)}>No, volver</button>
+              <button type="button" className="btn-danger" onClick={confirmar} disabled={trabajando || dlg.cuantos === 0}>{trabajando ? 'Eliminando…' : 'Sí, eliminar'}</button>
+            </div>
+          </div>
+        </Dialogo>
+      )}
+    </section>
+  );
+}
+
 export default function Auditoria() {
   const [pestana, setPestana] = useState('actividad');
   const [periodo, setPeriodo] = useState('7');
   const [esp, setEsp] = useState(null);
   const [resumen, setResumen] = useState(null);
+  const [version, setVersion] = useState(0);
   useEffect(() => { getAuditoria({ desde: desdeISO('hoy'), limite: 500 }).then(d => setResumen({ hoy: d.length })).catch(() => setResumen({ hoy: null })); }, []);
   const pct = esp ? Math.min(100, esp.base_bytes / 1048576 / Number(esp.limite_mb) * 100) : null;
   const cifras = pestana === 'espacio' && esp
@@ -272,8 +347,9 @@ export default function Auditoria() {
         </div>
       </PageHeader>
       <div id="aud-panel" role="tabpanel" aria-labelledby={`tab-${pestana}`}>
-        {pestana === 'actividad' && <Actividad periodo={periodo} setPeriodo={setPeriodo} />}
-        {pestana === 'accesos' && <Accesos periodo={periodo} setPeriodo={setPeriodo} />}
+        {pestana !== 'espacio' && <PanelLimpieza onBorrado={() => setVersion(v => v + 1)} />}
+        {pestana === 'actividad' && <Actividad key={version} periodo={periodo} setPeriodo={setPeriodo} />}
+        {pestana === 'accesos' && <Accesos key={version} periodo={periodo} setPeriodo={setPeriodo} />}
         {pestana === 'espacio' && <Espacio onDatos={setEsp} />}
       </div>
     </div>

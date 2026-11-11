@@ -29,6 +29,9 @@ async function llamar(accion, datos) {
 }
 
 export const crearUsuario = ({ email, password, rol, nombre }) => llamar('crear', { email, password, rol, nombre });
+/** Crea a alguien que entra con cédula (tipo 'cedula', rol usuario) o con usuario (tipo 'usuario', rol ingeniero). Devuelve el PIN una sola vez. */
+export const crearAcceso = ({ tipo, identificador, nombre, procesos }) => llamar('crear', { tipo, identificador, nombre, procesos });
+export const nuevoPinDeUsuario = ({ user_id }) => llamar('pin', { user_id });
 export const cambiarClaveDeUsuario = ({ user_id, password }) => llamar('clave', { user_id, password });
 export const quitarUsuario = ({ user_id }) => llamar('eliminar', { user_id });
 
@@ -44,3 +47,15 @@ export async function cambiarMiNombre(nombre) {
   if (error) throw new Error(traducirError(error));
   window.dispatchEvent(new Event('tm:sesion-cambio'));
 }
+
+/** «¿Olvidaste tu contraseña?»: pide el enlace por correo (solo administradores y digitadores). Responde igual exista o no el correo. */
+export async function recuperarClave(email) {
+  const resp = await fetch('/api/recuperar-clave', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+  if (resp.status === 404) throw new Error('El servicio de recuperación no está disponible aquí (las funciones de Cloudflare no corren con "npm run dev").');
+  const cuerpo = await resp.json().catch(() => null);
+  if (!resp.ok) throw new Error(cuerpo?.error || `No se pudo enviar el correo (código ${resp.status}).`);
+  return true;
+}
+
+/** Un PIN para mostrar: 482915 → «482 915». */
+export const formatearPin = pin => String(pin || '').replace(/(\d{3})(\d{3})/, '$1 $2');

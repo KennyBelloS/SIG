@@ -13,7 +13,9 @@
  * si crear la cuenta funciona pero asignar el rol falla, la cuenta se borra (no quedan cuentas a medias).
  */
 
-const ROLES = ['admin', 'digitador', 'usuario'];
+import { normalizarIdentificador, correoDeAcceso, generarPin } from './_acceso.js';
+
+const ROLES = ['admin', 'digitador', 'ingeniero', 'usuario'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -83,21 +85,78 @@ async function auditar(c, quien, fila) {
   try { await sb(c, '/rest/v1/indicadores_auditoria', { metodo: 'POST', cabeceras: { Prefer: 'return=minimal' }, cuerpo: [{ user_id: quien.id, email: quien.email || null, nombre: quien.nombre || null, tipo: 'usuario', entidad: 'indicadores_usuarios', ...fila }] }); } catch { /* sin auditoría no se detiene la acción */ }
 }
 
-async function asignarRol(c, { user_id, email, rol, nombre }) {
+async function asignarRol(c, { user_id, email, rol, nombre, extra = {} }) {
   return sb(c, '/rest/v1/indicadores_usuarios?on_conflict=user_id', {
     metodo: 'POST',
     cabeceras: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    cuerpo: [nombre ? { user_id, email, rol, nombre } : { user_id, email, rol }],
+    cuerpo: [{ user_id, email, rol, ...(nombre ? { nombre } : {}), ...extra }],
   });
 }
 
+/** Crea a una persona que entra con CÉDULA (rol usuario) o con USUARIO (rol ingeniero). La aplicación genera el PIN; solo se devuelve aquí, una vez. */
+async function crearPorIdentificador(c, cuerpo, quien, tipo) {
+  const nombre = typeof cuerpo.nombre === 'string' ? cuerpo.nombre.trim() : '';
+  if (nombre.length < 3 || nombre.length > 80) return json({ error: 'Escribe el nombre completo de la persona (de 3 a 80 letras).' }, 400);
+  const identificador = normalizarIdentificador(tipo, cuerpo.identificador);
+  if (!identificador) return json({ error: tipo === 'cedula' ? 'Escribe la cédula solo con números (de 5 a 12 dígitos).' : 'El usuario debe tener de 3 a 30 caracteres: letras sin tilde, números, punto, guion o guion bajo.' }, 400);
+  const rol = tipo === 'cedula' ? 'usuario' : 'ingeniero';
+  const procesos = tipo === 'usuario' && Array.isArray(cuerpo.procesos) ? [...new Set(cuerpo.procesos.map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 50) : [];
+  const dup = await sb(c, `/rest/v1/indicadores_usuarios?identificador=ilike.${encodeURIComponent(identificador)}&select=user_id`);
+  if (dup.ok && Array.isArray(dup.datos) && dup.datos.length) return json({ error: tipo === 'cedula' ? 'Ya hay una persona con esa cédula.' : 'Ya hay una persona con ese usuario.' }, 409);
+
+  const email = correoDeAcceso(identificador);
+  let alta = null, pin = null;
+  for (let intento = 0; intento < 5; intento++) {   // si Supabase rechaza un PIN por débil, se genera otro
+    pin = generarPin();
+    alta = await sb(c, '/auth/v1/admin/users', { metodo: 'POST', cuerpo: { email, password: pin, email_confirm: true, user_metadata: { identificador, tipo } } });
+    if (alta.ok && alta.datos?.id) break;
+    if (!/weak|password/i.test(String(alta.datos?.msg || alta.datos?.message || alta.datos?.error_code || ''))) break;
+  }
+  if (!alta.ok || !alta.datos?.id) {
+    const yaExiste = alta.status === 422 || alta.status === 409 || /already|registered|exists/i.test(String(alta.datos?.msg || alta.datos?.message || alta.datos?.error_code || ''));
+    return json({ error: yaExiste ? (tipo === 'cedula' ? 'Ya existe una cuenta con esa cédula.' : 'Ya existe una cuenta con ese usuario.') : mensajeDeSupabase(alta, 'No se pudo crear el acceso. Inténtalo de nuevo.') }, yaExiste ? 409 : (alta.status >= 500 ? 502 : 400));
+  }
+  const id = alta.datos.id;
+  const r = await asignarRol(c, { user_id: id, email, rol, nombre, extra: { identificador, tipo_acceso: tipo, procesos } });
+  if (!r.ok) {
+    await sb(c, `/auth/v1/admin/users/${id}`, { metodo: 'DELETE' });   // sin cuentas a medias
+    return json({ error: 'No se pudo guardar a la persona, así que el acceso no se creó. ¿Ya ejecutaste el SQL del bloque 19? Inténtalo de nuevo.' }, 500);
+  }
+  await auditar(c, quien, { accion: 'crear', entidad_id: id, resumen: `Usuario: ${nombre} (${tipo === 'cedula' ? 'cédula' : 'usuario'} ${identificador}), con rol ${rol}`, despues: { identificador, rol, nombre, tipo_acceso: tipo, procesos } });
+  return json({ ok: true, adoptado: false, usuario: { id, identificador, rol, nombre }, pin }, 201);
+}
+
+/** Un PIN nuevo para quien entra con cédula o con usuario (si lo olvidó). */
+async function nuevoPin(c, cuerpo, quien) {
+  if (!UUID.test(String(cuerpo.user_id || ''))) return json({ error: 'Falta indicar de quién es la cuenta.' }, 400);
+  const en = await sb(c, `/rest/v1/indicadores_usuarios?user_id=eq.${cuerpo.user_id}&select=tipo_acceso,identificador,nombre`);
+  if (!en.ok || !Array.isArray(en.datos) || !en.datos.length) return json({ error: 'Esa cuenta no está en la lista de usuarios de la aplicación.' }, 404);
+  const p = en.datos[0];
+  if ((p.tipo_acceso || 'correo') === 'correo') return json({ error: 'Esa persona entra con correo y contraseña: usa «Nueva contraseña».' }, 400);
+  let pin = null, r = null;
+  for (let intento = 0; intento < 5; intento++) {
+    pin = generarPin();
+    r = await sb(c, `/auth/v1/admin/users/${cuerpo.user_id}`, { metodo: 'PUT', cuerpo: { password: pin } });
+    if (r.ok) break;
+    if (!/weak|password/i.test(String(r.datos?.msg || r.datos?.message || r.datos?.error_code || ''))) break;
+  }
+  if (!r.ok) return json({ error: mensajeDeSupabase(r, 'No se pudo generar el PIN.') }, r.status >= 500 ? 502 : 400);
+  await auditar(c, quien, { accion: 'editar', entidad_id: cuerpo.user_id, resumen: `PIN de ${p.nombre || p.identificador} restablecido` });
+  return json({ ok: true, pin });
+}
+
 async function crear(c, cuerpo, quien) {
+  if (cuerpo.tipo === 'cedula' || cuerpo.tipo === 'usuario') return crearPorIdentificador(c, cuerpo, quien, cuerpo.tipo);
+  if (cuerpo.rol === 'ingeniero' || cuerpo.rol === 'usuario') {
+    // por correo solo entran el administrador y el digitador; los demás roles entran por cédula o por usuario
+    if (cuerpo.tipo === 'correo' || cuerpo.tipo === undefined) { /* se permite por compatibilidad: cuentas de consulta que ya entraban con correo */ }
+  }
   const email = String(cuerpo.email || '').trim().toLowerCase();
   const rol = String(cuerpo.rol || '');
   const nombre = typeof cuerpo.nombre === 'string' ? cuerpo.nombre.trim() : '';
   if (nombre.length > 80) return json({ error: 'El nombre no puede pasar de 80 letras.' }, 400);
   if (!email || email.length > 254 || !CORREO.test(email)) return json({ error: 'Escribe un correo válido.' }, 400);
-  if (!ROLES.includes(rol)) return json({ error: 'Elige un rol: administrador, digitador o usuario.' }, 400);
+  if (!ROLES.includes(rol)) return json({ error: 'Elige un rol: administrador, digitador, ingeniero o usuario.' }, 400);
   const fallaClave = validarClave(cuerpo.password, email);
   if (fallaClave) return json({ error: fallaClave }, 400);
 
@@ -143,8 +202,9 @@ async function cambiarClave(c, cuerpo, quien) {
 async function eliminar(c, cuerpo, quien) {
   if (!UUID.test(String(cuerpo.user_id || ''))) return json({ error: 'Falta indicar de quién es la cuenta.' }, 400);
   if (String(cuerpo.user_id).toLowerCase() === String(quien.id).toLowerCase()) return json({ error: 'No puedes quitarte el acceso a ti mismo.' }, 400);
-  const previo = await sb(c, `/rest/v1/indicadores_usuarios?user_id=eq.${cuerpo.user_id}&select=email`);
-  const correo = Array.isArray(previo.datos) && previo.datos[0]?.email ? previo.datos[0].email : String(cuerpo.user_id);
+  const previo = await sb(c, `/rest/v1/indicadores_usuarios?user_id=eq.${cuerpo.user_id}&select=email,nombre,identificador,tipo_acceso`);
+  const p0 = Array.isArray(previo.datos) ? previo.datos[0] : null;
+  const correo = p0 ? ((p0.tipo_acceso && p0.tipo_acceso !== 'correo') ? `${p0.nombre || ''} (${p0.identificador})`.trim() : (p0.email || String(cuerpo.user_id))) : String(cuerpo.user_id);
   const fila = await sb(c, `/rest/v1/indicadores_usuarios?user_id=eq.${cuerpo.user_id}`, { metodo: 'DELETE', cabeceras: { Prefer: 'return=minimal' } });
   if (!fila.ok) return json({ error: 'No se pudo quitar el acceso. Inténtalo de nuevo.' }, 500);
   const cuenta = await sb(c, `/auth/v1/admin/users/${cuerpo.user_id}`, { metodo: 'DELETE' });
@@ -176,6 +236,7 @@ export async function onRequestPost({ request, env }) {
     switch (cuerpo.accion) {
       case 'crear': return await crear(c, cuerpo, quien);
       case 'clave': return await cambiarClave(c, cuerpo, quien);
+      case 'pin': return await nuevoPin(c, cuerpo, quien);
       case 'eliminar': return await eliminar(c, cuerpo, quien);
       default: return json({ error: 'Acción desconocida.' }, 400);
     }

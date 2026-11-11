@@ -11,13 +11,14 @@ import { avisar } from '../../lib/toast';
 
 /* Las piezas del teléfono: barra superior, búsqueda flotante, pestañas de abajo y las hojas que suben desde abajo. */
 
-export function MovilBarra({ sesion, onCuenta, onCrear, fabRef, campana, titulo }) {
+export function MovilBarra({ sesion, onCuenta, onCrear, onBuscar, fabRef, campana, titulo }) {
   const inicial = (sesion?.nombreVisible || sesion?.email || '?').trim()[0]?.toUpperCase();
   return (
     <header className="mv-barra">
       <Link to="/inicio" className="logo-ficha mv-logo" aria-label="Falcon Farms, Finca Torremolinos: ir al inicio"><img src="/logo-icon.png" alt="" /></Link>
       <p className="mv-seccion" aria-live="polite"><span key={titulo}>{titulo || 'Sistema de gestión'}</span></p>
       <div className="mv-acciones">
+        <button type="button" className="mv-lupa" onClick={onBuscar} aria-label="Buscar un indicador o una sección" aria-haspopup="dialog"><i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i></button>
         {campana}
         <button type="button" className="mv-avatar" onClick={onCuenta} aria-label={`Mi cuenta: ${sesion?.nombreVisible || sesion?.email || ''}`} aria-haspopup="dialog"><span aria-hidden="true">{inicial}</span></button>
         <button type="button" className="mv-fab" ref={fabRef} onClick={onCrear} aria-label="¿Qué quieres hacer hoy?" aria-haspopup="dialog"><i className="fa-solid fa-plus" aria-hidden="true"></i></button>
@@ -34,16 +35,18 @@ export function MovilBuscar({ onBuscar }) {
   );
 }
 
-/** Cuatro pestañas, como en la app de referencia: lo demás vive en «Más». */
-export function MovilTabs({ onMas, masActivo }) {
+/** Cinco pestañas, todas con su nombre a la vista: Inicio, Indicadores, Matriz, la cuarta según el rol (Dashboard o Informe) y «Más». */
+export function MovilTabs({ onMas, masActivo, dashboard }) {
   const tab = (to, icono, texto) => (
     <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'activo' : '')}><i className={`fa-solid ${icono}`} aria-hidden="true"></i><span>{texto}</span></NavLink>
   );
   return (
+    // Mismo orden que la barra del computador: Inicio, Dashboard (si eres admin), Matriz, Indicadores.
     <nav className="mv-tabs" aria-label="Secciones">
       {tab('/inicio', 'fa-table-cells-large', 'Inicio')}
-      {tab('/indicadores', 'fa-chart-simple', 'Indicadores')}
+      {dashboard && tab(dashboard.to, 'fa-chart-pie', dashboard.corto || dashboard.texto)}
       {tab('/matriz', 'fa-table', 'Matriz')}
+      {tab('/indicadores', 'fa-chart-simple', 'Indicadores')}
       <button type="button" onClick={onMas} className={masActivo ? 'activo' : ''} aria-haspopup="dialog"><i className="fa-solid fa-ellipsis" aria-hidden="true"></i><span>Más</span></button>
     </nav>
   );
@@ -81,7 +84,7 @@ function Anillo({ valor, tam = 88 }) {
 
 /** «Más»: el centro de control. Tu mes con su anillo, los avisos recientes, los módulos con su estado EN VIVO y las preferencias
  *  (modo oscuro, tamaño de letra, movimiento), además de instalar la app, cambiar tu nombre y tu contraseña y cerrar sesión. */
-export function HojaMas({ grupos, onCerrar, navegar, sesion, onHoja, onNombre, onClave, onInstalar }) {
+export function HojaMas({ grupos, cuarto, onCerrar, navegar, sesion, onHoja, onNombre, onClave, onInstalar }) {
   const { anio, mesActual } = mesReporteActual();
   const [r, setR] = useState(null);
   const [cambiosHoy, setCambiosHoy] = useState(null);
@@ -117,9 +120,10 @@ export function HojaMas({ grupos, onCerrar, navegar, sesion, onHoja, onNombre, o
     '/ayuda': 'Recorrido animado y preguntas frecuentes',
   };
   const insignia = { '/novedades': t?.sinPlan || 0 };
-  const fuera = new Set(['/inicio', '/indicadores', '/matriz']);
+  const enBarra = new Set(['/inicio', '/indicadores', '/matriz', cuarto?.to].filter(Boolean));
   const qq = q.trim().toLowerCase(), coincide = (...c) => !qq || c.some(x => String(x || '').toLowerCase().includes(qq));
-  const lista = grupos.map(g => ({ ...g, items: g.items.filter(i => !fuera.has(i.to) && coincide(i.texto, detalle[i.to])) })).filter(g => g.items.length);
+  const lista = grupos.map(g => ({ ...g, items: g.items.filter(i => coincide(i.texto, detalle[i.to])) })).filter(g => g.items.length);
+  const nModulos = lista.reduce((n, g) => n + g.items.length, 0);
   const atajos = [
     sesion?.puedeRegistrar && { k: 'falta', icono: 'fa-list-check', texto: 'Lo que falta registrar', n: t?.pendientes, accion: ir(() => onHoja('pendientes')) },
     { k: 'nocumple', icono: 'fa-triangle-exclamation', texto: 'Lo que no cumple', n: t?.noCumplen, tono: 'mal', accion: ir(() => onHoja('nocumplen')) },
@@ -145,14 +149,41 @@ export function HojaMas({ grupos, onCerrar, navegar, sesion, onHoja, onNombre, o
         </section>
       )}
 
+      {lista.length > 0 && (
+        <section className="mas-modulos" aria-labelledby="mas-mod-t">
+          <h3 className="mas-banda mas-banda-mod" id="mas-mod-t"><i className="fa-solid fa-grip" aria-hidden="true"></i> Módulos <b>{nModulos}</b></h3>
+          <p className="mas-banda-sub">Las pantallas de la aplicación. Las marcadas con <i className="fa-solid fa-thumbtack" aria-hidden="true"></i> también están en la barra de abajo.</p>
+          {lista.map(g => (
+            <div key={g.titulo} className="hoja-grupo mas-mod-grupo">
+              <h4>{g.titulo}</h4>
+              <ul className="mas-mod-red">
+                {g.items.map(i => (
+                  <li key={i.to}>
+                    <button type="button" className={`mas-mod${enBarra.has(i.to) ? ' fija' : ''}`} onClick={() => { onCerrar(); navegar(i.to); }}>
+                      <span className="mas-mod-ico"><i className={`fa-solid ${i.icono}`} aria-hidden="true"></i></span>
+                      <strong>{i.texto}</strong>
+                      <small>{detalle[i.to] || (enBarra.has(i.to) ? 'En la barra de abajo' : '')}</small>
+                      {insignia[i.to] > 0 && <b className="hoja-insignia" aria-label={`${insignia[i.to]} por atender`}>{insignia[i.to]}</b>}
+                      {enBarra.has(i.to) && <i className="fa-solid fa-thumbtack mas-mod-pin" aria-hidden="true"></i>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {(atajos.length > 0 || hayPref || (!qq && avisos.length > 0)) && <h3 className="mas-banda mas-banda-otras"><i className="fa-solid fa-sliders" aria-hidden="true"></i> Otras opciones</h3>}
       {atajos.length > 0 && (
         <section className="hoja-grupo mas-atajos" aria-label="Atajos">
           <h3>Atajos</h3>
           <div className="mas-atajos-red">
             {atajos.map(a => (
-              <button key={a.k} type="button" className={`mas-atajo${a.tono ? ` tono-${a.tono}` : ''}`} onClick={a.accion} disabled={a.girar} aria-label={a.n != null ? `${a.texto}: ${a.n}` : undefined}>
-                <span className="mas-atajo-ico"><i className={`fa-solid ${a.icono}${a.girar ? ' fa-spin' : ''}`} aria-hidden="true"></i>{a.n != null && <b aria-hidden="true">{a.n}</b>}</span>
+              <button key={a.k} type="button" className={`mas-atajo${a.tono ? ` tono-${a.tono}` : ''}`} onClick={a.accion} disabled={a.girar}>
+                <span className="mas-atajo-ico"><i className={`fa-solid ${a.icono}${a.girar ? ' fa-spin' : ''}`} aria-hidden="true"></i></span>
                 <span>{a.texto}</span>
+                {a.n != null && <b>{a.n}</b>}
               </button>
             ))}
           </div>
@@ -171,24 +202,6 @@ export function HojaMas({ grupos, onCerrar, navegar, sesion, onHoja, onNombre, o
           </ul>
         </section>
       )}
-
-      {lista.map(g => (
-        <section key={g.titulo} className="hoja-grupo">
-          <h3>{g.titulo}</h3>
-          <ul className="hoja-lista">
-            {g.items.map(i => (
-              <li key={i.to}>
-                <button type="button" onClick={() => { onCerrar(); navegar(i.to); }}>
-                  <span className="hoja-ico"><i className={`fa-solid ${i.icono}`} aria-hidden="true"></i></span>
-                  <span><strong>{i.texto}</strong><small>{detalle[i.to] || ''}</small></span>
-                  {insignia[i.to] > 0 && <b className="hoja-insignia" aria-label={`${insignia[i.to]} por atender`}>{insignia[i.to]}</b>}
-                  <i className="fa-solid fa-chevron-right hoja-flecha" aria-hidden="true"></i>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
 
       {nada && <div className="estado-vacio"><i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i><h3>Nada coincide con «{q}»</h3><p>Prueba con otra palabra.</p></div>}
 

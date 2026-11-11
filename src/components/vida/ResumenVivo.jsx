@@ -1,41 +1,39 @@
 import { useEffect, useRef, useState } from 'react';
 import { menosMovimiento } from '../../lib/preferencias';
 
-function Mariposa() {
-  const ala = (
-    <g>
-      <path className="m-ala-s" d="M31 27C23 8 5 6 3 17c-1 9 15 16 28 13z" fill="url(#mpA)" />
-      <path className="m-ala-i" d="M31 31C20 33 8 42 13 48c6 4 16-4 18-13z" fill="url(#mpB)" />
-      <circle cx="14" cy="18" r="3.2" fill="#fff" opacity=".75" /><circle cx="17" cy="42" r="2.2" fill="#fff" opacity=".7" />
-    </g>
-  );
+function Colibri() {
+  const ala = <path className="m-ala-s" d="M29 23C19 8 3 9 2 19c-1 7 12 12 25 10z" fill="url(#coA)" opacity=".94" />;
   return (
-    <svg className="mariposa" viewBox="0 0 64 54" width="96" height="81" aria-hidden="true" focusable="false">
+    <svg className="colibri" viewBox="0 0 64 54" width="96" height="81" aria-hidden="true" focusable="false">
       <defs>
-        <linearGradient id="mpA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#F0C25A" /><stop offset="1" stopColor="#2F9E4F" /></linearGradient>
-        <linearGradient id="mpB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#C9932B" /><stop offset="1" stopColor="#A91D3A" /></linearGradient>
+        <linearGradient id="coA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#3FAE62" /><stop offset="1" stopColor="#0F3D22" /></linearGradient>
+        <linearGradient id="coB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#F0C25A" /><stop offset="1" stopColor="#C9932B" /></linearGradient>
       </defs>
       <g className="m-izq">{ala}</g>
       <g className="m-der" transform="translate(64 0) scale(-1 1)">{ala}</g>
-      <ellipse cx="32" cy="30" rx="2.6" ry="11" fill="#1C2321" /><circle cx="32" cy="17" r="3" fill="#1C2321" />
-      <path d="M31 15.5C28 9 25 7 22 7M33 15.5C36 9 39 7 42 7" stroke="#1C2321" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+      <path d="M32 38L24 51 32 44 40 51z" fill="#0F3D22" />
+      <ellipse cx="32" cy="29" rx="6.5" ry="13" fill="url(#coB)" />
+      <circle cx="32" cy="15" r="6.2" fill="url(#coA)" />
+      <path d="M32 10C33 4 38 1 44 .5 39 4 36 7 33.5 11z" fill="#1C2321" />
+      <circle cx="34.6" cy="13.6" r="1.1" fill="#1C2321" />
     </svg>
   );
 }
 
-/** Una mariposa cuelga de un hilo (como la araña que va a buscar cada pieza): vuela a una fila de la lista, TOMA su ícono, se lo lleva
+/** Un colibrí cuelga de un hilo (como la araña que va a buscar cada pieza): vuela a una fila de la lista, TOMA su ícono, se lo lleva
  *  hasta el escenario y ahí cambia el resumen; el ícono anterior vuelve a su fila. Cambia sola cada pocos segundos; se puede pausar o tocar una fila. */
 export default function ResumenVivo({ items, titulo = 'Resumen vivo', intervalo = 2200 }) {
   const n = items.length;
   const [activo, setActivo] = useState(0);
   const [llevando, setLlevando] = useState(null);
   const [juega, setJuega] = useState(true);
-  const pausa = false;   // solo se detiene con el botón de pausa: la mariposa lleva todo automáticamente
+  const pausa = false;   // solo se detiene con el botón de pausa: el colibrí lleva todo automáticamente
   const reducido = menosMovimiento();
   const escena = useRef(null), chips = useRef([]), slot = useRef(null), bicho = useRef(null), hilo = useRef(null);
   const pos = useRef({ x: 0, y: 0, listo: false }), ocupado = useRef(false), vivo = useRef(true);
 
-  const centro = el => { const r = el.getBoundingClientRect(), e = escena.current.getBoundingClientRect(); return { x: r.left - e.left + r.width / 2, y: r.top - e.top + r.height / 2 }; };
+  const centro = el => { if (!el || !escena.current) return { x: 0, y: 0 };   // la pieza ya no está (se salió del Dashboard mientras volaba)
+    const r = el.getBoundingClientRect(), e = escena.current.getBoundingClientRect(); return { x: r.left - e.left + r.width / 2, y: r.top - e.top + r.height / 2 }; };
   const pintar = (x, y, giro = 0) => {
     if (!bicho.current || !hilo.current || !escena.current) return;
     const ax = escena.current.clientWidth / 2;
@@ -61,7 +59,7 @@ export default function ResumenVivo({ items, titulo = 'Resumen vivo', intervalo 
     const chip = chips.current[k]; if (!chip || !slot.current) return;
     ocupado.current = true;
     await mover(centro(chip), 950); if (!vivo.current) return;
-    setLlevando(k); await esperar(260);                                         // la mariposa toma el ícono
+    setLlevando(k); await esperar(260);                                         // el colibrí toma el ícono
     const s = centro(slot.current); await mover({ x: s.x, y: s.y - 4 }, 1050); if (!vivo.current) return;
     setActivo(k); setLlevando(null); await esperar(520);                        // lo deja en el escenario: el resumen cambia
     ocupado.current = false;
@@ -91,12 +89,12 @@ export default function ResumenVivo({ items, titulo = 'Resumen vivo', intervalo 
   return (
     <section className="panel resumen-vivo" aria-label={titulo}>
       <div className="panel-header">
-        <div><h2>{titulo}</h2><p className="sub">La mariposa va llevando, sola y una por una, cada pieza al escenario.</p></div>
+        <div><h2>{titulo}</h2><p className="sub">El colibrí va llevando, solo y una por una, cada pieza al escenario.</p></div>
         {!reducido && <button type="button" className="btn-texto rv-play" onClick={() => setJuega(j => !j)} aria-label={juega ? 'Pausar el resumen' : 'Reproducir el resumen'}><i className={`fa-solid ${juega ? 'fa-pause' : 'fa-play'}`} aria-hidden="true"></i></button>}
       </div>
       <div className="rv-escena rv2" ref={escena}>
         <svg className="rv-hilo" aria-hidden="true" focusable="false"><path ref={hilo} d="M0 0" /></svg>
-        <span className="rv-bicho" ref={bicho} aria-hidden="true"><Mariposa />{llevando != null && <span className="rv-llevado"><i className={`fa-solid ${items[llevando].icono}`}></i></span>}</span>
+        <span className="rv-bicho" ref={bicho} aria-hidden="true"><Colibri />{llevando != null && <span className="rv-llevado"><i className={`fa-solid ${items[llevando].icono}`}></i></span>}</span>
         <ul className="rv-lista">
           {items.map((it, k) => (
             <li key={it.id}>

@@ -487,6 +487,18 @@ export async function getHistorialNotificaciones(limite = 20) {
   return data || [];
 }
 
+/** Elimina un solo envío del historial. */
+export async function eliminarNotificacion(id) {
+  const { error } = await supabase.from('indicadores_notificaciones').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** Elimina todo el historial de envíos. */
+export async function eliminarHistorialNotificaciones() {
+  const { error } = await supabase.from('indicadores_notificaciones').delete().not('id', 'is', null);
+  if (error) throw error;
+}
+
 async function leerRespuestaSegura(resp) {
   const texto = await resp.text();
   if (!texto) return { error: `El servidor respondió vacío (código ${resp.status}).` };
@@ -892,7 +904,8 @@ export function tendenciaLineal(puntos) {
 export const ROLES = {
   admin: { nombre: 'Administrador', descripcion: 'Todo: configuración, cierres, usuarios, dashboard, novedades, importación y correos.' },
   digitador: { nombre: 'Digitador', descripcion: 'Registra datos de los indicadores (a mano o con Excel) y consulta matriz e informes. No configura.' },
-  usuario: { nombre: 'Usuario', descripcion: 'Solo consulta: indicadores, matriz e informes. No registra ni modifica nada.' },
+  ingeniero: { nombre: 'Ingeniero', descripcion: 'Solo consulta, con sus procesos asignados a la vista. Entra con el usuario que le crea un administrador y un PIN.' },
+  usuario: { nombre: 'Usuario', descripcion: 'Solo consulta: indicadores, matriz e informes. Entra con su cédula y un PIN que genera la aplicación.' },
 };
 
 

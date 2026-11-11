@@ -389,5 +389,100 @@ begin
   return jsonb_build_object('eliminados', v_n, 'corte', v_corte);
 end;
 $$;
-revoke all on function public.indicadores_depurar_bitacora() from public;
+revoke all on function public.indicadores_depurar_bitacora() from public, anon;
 grant execute on function public.indicadores_depurar_bitacora() to authenticated, service_role;
+
+-- =====================================================================
+-- 18) Bitácora: borrado MANUAL (accesos / actividad / todo) y borrado AUTOMÁTICO el primer martes de cada mes,
+--     con aviso previo y 2 días de plazo para cancelarlo. Reemplaza al bloque 17.
+-- =====================================================================
+alter table public.indicadores_configuracion
+  add column if not exists depuracion_objetivo date,            -- el martes para el que se avisó
+  add column if not exists depuracion_aviso_en timestamptz,     -- cuándo se avisó (el borrado exige 2 días completos después)
+  add column if not exists depuracion_cancelada boolean not null default false;
+
+drop function if exists public.indicadores_depurar_bitacora();
+
+-- p_modo: 'accesos' (quién entra y sale), 'actividad' (todo lo demás) o 'todo'. Las notas de depuración anteriores se conservan.
+create or replace function public.indicadores_depurar_bitacora(p_modo text default 'todo')
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_n bigint;
+  v_quien text;
+  v_texto text;
+begin
+  if auth.role() is distinct from 'service_role' and public.rol_actual() is distinct from 'admin' then
+    raise exception 'Solo un administrador puede depurar la bitácora.' using errcode = '42501';
+  end if;
+  if p_modo not in ('accesos', 'actividad', 'todo') then
+    raise exception 'Modo no válido: %', p_modo using errcode = '22023';
+  end if;
+  v_quien := coalesce((select email from public.indicadores_usuarios where user_id = auth.uid()), 'el despertador automático');
+  delete from public.indicadores_auditoria
+   where accion <> 'depurar'
+     and case p_modo when 'accesos' then tipo = 'acceso' when 'actividad' then tipo <> 'acceso' else true end;
+  get diagnostics v_n = row_count;
+  v_texto := case p_modo when 'accesos' then 'los accesos' when 'actividad' then 'la actividad' else 'los accesos y la actividad' end;
+  if v_n > 0 then
+    insert into public.indicadores_auditoria (tipo, accion, resumen, despues)
+    values ('configuracion', 'depurar', format('Se eliminaron %s registros de %s (por %s)', v_n, v_texto, v_quien), jsonb_build_object('modo', p_modo, 'eliminados', v_n, 'por', v_quien));
+  end if;
+  return jsonb_build_object('eliminados', v_n, 'modo', p_modo);
+end;
+$$;
+revoke all on function public.indicadores_depurar_bitacora(text) from public, anon;
+grant execute on function public.indicadores_depurar_bitacora(text) to authenticated, service_role;
+
+-- Cancelar (o reactivar) la eliminación automática de este mes. Solo un administrador.
+create or replace function public.indicadores_depuracion_cancelar(p_cancelar boolean default true)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_obj date;
+begin
+  if public.rol_actual() is distinct from 'admin' then
+    raise exception 'Solo un administrador puede cancelar la eliminación automática.' using errcode = '42501';
+  end if;
+  update public.indicadores_configuracion set depuracion_cancelada = p_cancelar where id = 1 returning depuracion_objetivo into v_obj;
+  insert into public.indicadores_auditoria (tipo, accion, resumen, user_id, email)
+  select 'configuracion', 'editar',
+         case when p_cancelar then 'Se canceló la eliminación automática de la bitácora de este mes' else 'Se reactivó la eliminación automática de la bitácora' end,
+         u.user_id, u.email
+    from public.indicadores_usuarios u where u.user_id = auth.uid();
+  return jsonb_build_object('cancelada', p_cancelar, 'objetivo', v_obj);
+end;
+$$;
+revoke all on function public.indicadores_depuracion_cancelar(boolean) from public, anon;
+grant execute on function public.indicadores_depuracion_cancelar(boolean) to authenticated, service_role;
+
+-- =====================================================================
+-- 19) Rol «ingeniero», accesos por cédula / usuario y actualización en tiempo real
+--     Los usuarios de consulta entran con su CÉDULA y un PIN que genera la aplicación; los ingenieros, con el USUARIO que
+--     crea un administrador (y también un PIN). Administradores y digitadores siguen entrando con correo y contraseña.
+-- =====================================================================
+alter table public.indicadores_usuarios drop constraint if exists indicadores_usuarios_rol_check;
+alter table public.indicadores_usuarios add constraint indicadores_usuarios_rol_check check (rol in ('admin','digitador','ingeniero','usuario'));
+alter table public.indicadores_usuarios add column if not exists identificador text;                       -- cédula (usuarios) o nombre de usuario (ingenieros)
+alter table public.indicadores_usuarios add column if not exists tipo_acceso text not null default 'correo';
+alter table public.indicadores_usuarios drop constraint if exists indicadores_usuarios_tipo_acceso_check;
+alter table public.indicadores_usuarios add constraint indicadores_usuarios_tipo_acceso_check check (tipo_acceso in ('correo','cedula','usuario'));
+alter table public.indicadores_usuarios add column if not exists procesos integer[] not null default '{}';  -- procesos asignados (ingeniero)
+create unique index if not exists indicadores_usuarios_identificador_uq on public.indicadores_usuarios (lower(identificador)) where identificador is not null;
+
+-- Que la Matriz, el Dashboard y las fichas se actualicen solos cuando alguien registra o cambia algo
+do $$
+declare t text;
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    foreach t in array array['indicadores','indicadores_registros','indicadores_cierres','indicadores_procesos'] loop
+      begin execute format('alter publication supabase_realtime add table public.%I', t);
+      exception when duplicate_object then null; when undefined_table then null; end;
+    end loop;
+  end if;
+end $$;

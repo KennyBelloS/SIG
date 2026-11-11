@@ -1,3 +1,4 @@
+import { rolDeAyuda } from '../lib/acceso';
 import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import { useSesion } from '../lib/useSesion';
@@ -28,7 +29,7 @@ const nivel = g => (g.roles.includes('usuario') ? 'usuario' : g.roles.includes('
 
 export default function Ayuda() {
   const { sesion } = useSesion();
-  const real = sesion?.rol || 'usuario';
+  const real = rolDeAyuda(sesion?.rol);
   const [elegida, setVista] = useState(null);         // solo el administrador puede elegir otra vista
   const vista = elegida || 'admin';                     // por defecto, el administrador lo ve todo
   const rol = real === 'admin' ? vista : real;

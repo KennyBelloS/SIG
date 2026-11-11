@@ -947,3 +947,8 @@ begin
   dia := least(greatest(coalesce(dia, 15), 1), 28);
   return hoy > make_date(p_anio, p_mes, dia);
 end $$;
+
+-- Bitácora: eliminación automática el primer martes del mes (ver el bloque 18 de migracion_roles_y_metas.sql)
+alter table indicadores_configuracion add column if not exists depuracion_objetivo date;
+alter table indicadores_configuracion add column if not exists depuracion_aviso_en timestamptz;
+alter table indicadores_configuracion add column if not exists depuracion_cancelada boolean not null default false;

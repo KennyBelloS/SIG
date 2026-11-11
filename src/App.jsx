@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import RestablecerClave from './pages/RestablecerClave';
 import Indicadores from './pages/Indicadores';
 import IndicadorDetalle from './pages/IndicadorDetalle';
 import Dashboard from './pages/Dashboard';
@@ -34,10 +35,11 @@ function SoloRegistro({ sesion, children }) {
 }
 
 export default function App() {
-  const { cargando, sesion } = useSesion();
+  const { cargando, sesion, recuperando } = useSesion();
 
   if (cargando) return <div className="pantalla-carga">Cargando…</div>;
   if (!sesion) return <><Login /><Actualizador conSesion={false} /></>;
+  if (recuperando) return <><RestablecerClave /><Actualizador conSesion={false} /></>;   // abrió el enlace de «olvidé mi contraseña»
 
   return (
     <>

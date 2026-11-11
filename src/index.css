@@ -920,6 +920,35 @@ table.matriz{ border-collapse:separate; border-spacing:0; font-size:calc(13px * 
 .mc-flujo .n{ flex:none; width:22px; height:22px; border-radius:50%; background:var(--f-800); color:#fff; font-size:calc(11.5px * var(--esc,1)); font-weight:800; display:grid; place-items:center; } .mc-flujo li > i{ display:none; } .mc-flujo li b{ font-size:calc(13.5px * var(--esc,1)); } .mc-flujo li p{ font-size:calc(12.5px * var(--esc,1)); color:var(--ink-2); margin-top:2px; line-height:1.45; }
 @media (max-width:859px){ .mc-columnas{ grid-template-columns:minmax(0,1fr); gap:var(--s-4); } .mc-flecha{ display:none; } .mc-enlaces > div{ flex-direction:column; align-items:flex-start; } }
 
+/* ---------- «Todo conectado»: tarjeta oscura con insignias de color, al estilo del mapa de referencia ---------- */
+.mapa-con{ background:linear-gradient(165deg,#0B2317,#102A1E 55%,#0A1F14); border-radius:var(--r-3); padding:var(--s-6); }
+.mapa-con .panel-header{ border-bottom-color:rgba(255,255,255,.16); }
+.mapa-con .panel-header h2{ color:#fff; } .mapa-con .panel-header .sub{ color:rgba(255,255,255,.6); }
+.mapa-con .filtro-chip{ color:rgba(255,255,255,.72); } .mapa-con .filtro-chip-activo{ background:#fff; color:var(--f-900); }
+.mapa-con .mc-cab{ border-bottom-color:rgba(255,255,255,.16); } .mapa-con .mc-cab b{ color:#fff; } .mapa-con .mc-cab small{ color:rgba(255,255,255,.5); } .mapa-con .mc-flecha{ color:rgba(255,255,255,.4); }
+.mapa-con .mc-nodo, .mapa-con .mc-serv{ border-radius:999px; background:rgba(255,255,255,.07); border:1.5px solid rgba(255,255,255,.18); color:#fff; }
+.mapa-con .mc-serv{ border-radius:var(--r-3); }
+.mapa-con .mc-nodo i, .mapa-con .mc-serv i{ color:inherit; }
+.mapa-con .mc-nodo:hover, .mapa-con .mc-serv:hover{ border-color:rgba(255,255,255,.45); background:rgba(255,255,255,.12); }
+/* una insignia de color distinta por posición (igual que Agenda/Tareas/Notas/Avisos/Calendario/Asistente/Resumen en la referencia) */
+.mapa-con .mc-col .mc-nodo:nth-child(6n+1), .mapa-con .mc-servicios .mc-serv:nth-child(6n+1){ background:rgba(63,174,98,.24); border-color:#3FAE62; }
+.mapa-con .mc-col .mc-nodo:nth-child(6n+2), .mapa-con .mc-servicios .mc-serv:nth-child(6n+2){ background:rgba(201,147,43,.24); border-color:#C9932B; }
+.mapa-con .mc-col .mc-nodo:nth-child(6n+3), .mapa-con .mc-servicios .mc-serv:nth-child(6n+3){ background:rgba(169,29,58,.24); border-color:#D4415F; }
+.mapa-con .mc-col .mc-nodo:nth-child(6n+4), .mapa-con .mc-servicios .mc-serv:nth-child(6n+4){ background:rgba(79,138,217,.24); border-color:#4F8AD9; }
+.mapa-con .mc-col .mc-nodo:nth-child(6n+5), .mapa-con .mc-servicios .mc-serv:nth-child(6n+5){ background:rgba(214,110,166,.24); border-color:#D66EA6; }
+.mapa-con .mc-col .mc-nodo:nth-child(6n), .mapa-con .mc-servicios .mc-serv:nth-child(6n){ background:rgba(130,90,214,.24); border-color:#A27DE0; }
+.mapa-con .mc-nodo.sel, .mapa-con .mc-serv.sel{ background:#fff !important; color:var(--f-900) !important; border-color:#fff !important; box-shadow:0 10px 20px -12px rgba(0,0,0,.6); }
+.mapa-con .mc-nodo.sel i, .mapa-con .mc-serv.sel i{ color:var(--f-900) !important; }
+.mapa-con .mc-nodo.con, .mapa-con .mc-serv.con{ box-shadow:0 0 0 2px #fff inset; }
+.mapa-con .mc-nodo.apagado, .mapa-con .mc-serv.apagado{ opacity:.3; background:transparent !important; border-style:dashed; border-color:rgba(255,255,255,.3) !important; color:rgba(255,255,255,.5); }
+.mapa-con .mc-detalle{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); }
+.mapa-con .mc-detalle-cab h3{ color:#fff; } .mapa-con .mc-detalle-cab > i{ background:rgba(255,255,255,.18); }
+.mapa-con .mc-sirve{ color:#fff; } .mapa-con .mc-texto{ color:rgba(255,255,255,.72); } .mapa-con .mc-enlaces b{ color:rgba(255,255,255,.5); }
+.mapa-con .mc-chip{ background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.24); color:#fff; } .mapa-con .mc-chip:hover{ background:rgba(255,255,255,.2); border-color:#fff; }
+.mapa-con .mc-var{ background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.24); color:#fff; }
+.mapa-con .mc-flujo h3{ color:#fff; } .mapa-con .mc-flujo li{ background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.16); }
+.mapa-con .mc-flujo li b{ color:#fff; } .mapa-con .mc-flujo li p{ color:rgba(255,255,255,.65); }
+
 /* --- Impresión de la guía --- */
 @media print{
   .no-imprimir-ayuda{ display:none !important; }

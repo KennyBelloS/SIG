@@ -1,3 +1,4 @@
+import { proximaDepuracion } from './depuracion';
 import { useEffect, useState } from 'react';
 import { esIOS, esAndroid } from './movil';
 import { getResumenMes, mesReporteActual, MESES } from './indicadores';
@@ -76,11 +77,11 @@ export async function avisosDeLaSesion(sesion) {
   else if (restan <= 3) out.push({ id: `plazo-${anio}-${mesActual}-${restan}`, tono: restan <= 1 ? 'mal' : 'aten', icono: 'fa-hourglass-half', titulo: restan <= 0 ? `Hoy es el último día para registrar ${mes}` : `Quedan ${restan} ${restan === 1 ? 'día' : 'días'} para registrar ${mes}`, detalle: `El ${r.diaCierre} se cierra el mes.`, ruta: '/indicadores' });
   if (sesion?.puedeRegistrar && t.pendientes > 0 && !r.cerrado) out.push({ id: `pend-${anio}-${mesActual}-${t.pendientes}`, tono: 'aten', icono: 'fa-list-check', titulo: `Faltan ${t.pendientes} indicadores por registrar`, detalle: `De ${t.indicadores} que hay en ${mes}.`, ruta: '/indicadores' });
   if (t.sinPlan > 0) out.push({ id: `plan-${anio}-${mesActual}-${t.sinPlan}`, tono: 'mal', icono: 'fa-triangle-exclamation', titulo: `${t.sinPlan} ${t.sinPlan === 1 ? 'indicador no cumple y no tiene' : 'indicadores no cumplen y no tienen'} plan de acción`, detalle: 'Necesitan una acción correctiva.', ruta: '/indicadores' });
-  // La actividad de la Bitácora se elimina el día 1 de cada mes: se avisa a los administradores 5 días antes y al día siguiente de borrarla
+  // La actividad y los accesos se eliminan el primer martes del mes: se avisa a los administradores de 5 días antes (con 2 de plazo para cancelar)
   if (sesion?.esAdmin) {
-    const hoy = new Date(), faltan = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate() - hoy.getDate() + 1;
-    if (faltan <= 5) out.push({ id: `bitacora-${anio}-${mesActual}-${faltan}`, tono: faltan <= 2 ? 'mal' : 'aten', icono: 'fa-clock-rotate-left', titulo: faltan === 1 ? 'Mañana se elimina la actividad de la Bitácora' : `En ${faltan} días se elimina la actividad de la Bitácora`, detalle: 'Descárgala en Excel antes de que se borre.', ruta: '/bitacora' });
-    else if (hoy.getDate() <= 2) out.push({ id: `bitacora-limpia-${anio}-${mesActual}`, tono: 'ok', icono: 'fa-broom', titulo: 'La actividad del mes anterior ya se eliminó', detalle: 'La Bitácora empieza de nuevo este mes.', ruta: '/bitacora' });
+    const plan = proximaDepuracion();
+    let cancelada = false; try { cancelada = localStorage.getItem(`tm:dep-cancelada:${plan.iso}`) === '1'; } catch { /* nada */ }
+    if (plan.faltan >= 1 && plan.faltan <= 5 && !cancelada) out.push({ id: `bitacora-${plan.iso}`, tono: plan.faltan <= 2 ? 'mal' : 'aten', icono: 'fa-clock-rotate-left', titulo: plan.faltan === 1 ? 'Mañana se eliminan los accesos y la actividad' : `El ${plan.texto} se eliminan los accesos y la actividad`, detalle: 'Puedes cancelarlo o descargarlos antes en la Bitácora.', ruta: '/bitacora' });
   }
   return out;
 }

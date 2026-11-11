@@ -393,6 +393,38 @@ export async function onRequestPost({ request, env }) {
 }
 
 /* --------------------- Llamada diaria del programador -------------------- */
+/** Primer martes de un mes (día del mes). */
+export function primerMartes(anio, mes) { const dow = new Date(Date.UTC(anio, mes - 1, 1)).getUTCDay(); return 1 + ((2 - dow + 7) % 7); }
+const iso = (a, m, d) => `${a}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+const diasEntre = (a, b) => Math.round((Date.UTC(...b) - Date.UTC(...a)) / 86400000);
+
+/** Eliminación automática de la bitácora el primer martes del mes.
+ *  - De 5 a 1 día antes: se deja constancia del aviso (objetivo + hora). El panel y la campana lo muestran.
+ *  - El martes: si no se canceló y el aviso tiene 2 días completos o más, se borra; si no, ese mes no se borra nada. */
+async function gestionarDepuracion(db, cfg, hoy) {
+  if (!cfg) return { omitido: 'sin configuración' };
+  try {
+    const t1 = primerMartes(hoy.anio, hoy.mes);
+    const [oa, om, od] = hoy.dia <= t1 ? [hoy.anio, hoy.mes, t1] : (hoy.mes === 12 ? [hoy.anio + 1, 1, primerMartes(hoy.anio + 1, 1)] : [hoy.anio, hoy.mes + 1, primerMartes(hoy.anio, hoy.mes + 1)]);
+    const objetivo = iso(oa, om, od), faltan = diasEntre([hoy.anio, hoy.mes - 1, hoy.dia], [oa, om - 1, od]);
+    if (faltan >= 1 && faltan <= 5) {
+      if (cfg.depuracion_objetivo !== objetivo) await db.patch('indicadores_configuracion?id=eq.1', { depuracion_objetivo: objetivo, depuracion_aviso_en: new Date().toISOString() });
+      return { aviso: objetivo, faltan };
+    }
+    if (faltan === 0) {
+      const aviso = cfg.depuracion_aviso_en ? new Date(cfg.depuracion_aviso_en).getTime() : null;
+      const conPlazo = cfg.depuracion_objetivo === objetivo && aviso != null && (Date.now() - aviso) >= 2 * 86400000;
+      const reinicio = { depuracion_objetivo: null, depuracion_aviso_en: null, depuracion_cancelada: false };
+      if (cfg.depuracion_cancelada) { await db.patch('indicadores_configuracion?id=eq.1', reinicio); return { cancelada: true }; }
+      if (!conPlazo) { await db.patch('indicadores_configuracion?id=eq.1', reinicio); return { omitido: 'sin los 2 días de aviso' }; }
+      const r = await db.rpc('indicadores_depurar_bitacora', { p_modo: 'todo' });
+      await db.patch('indicadores_configuracion?id=eq.1', reinicio);
+      return { depurada: true, ...(r || {}) };
+    }
+    return { proxima: objetivo, faltan };
+  } catch (e) { return { error: String(e.message || e).slice(0, 200) }; }
+}
+
 export async function onRequestGet({ request, env }) {
   try {
     const url = new URL(request.url);
@@ -401,12 +433,12 @@ export async function onRequestGet({ request, env }) {
     if (!ctx) return json({ error: 'Falta configurar SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.' }, 500);
     const { db, appUrl } = ctx;
 
-    // La actividad (bitácora) se elimina cada mes: del día 1 al 3 se borra la de los meses anteriores (si el despertador falló el 1, se recupera).
-    // Corre aunque los correos estén desactivados.
-    let depuracion = null;
-    if (ahoraColombia().dia <= 3) { try { depuracion = await db.rpc('indicadores_depurar_bitacora'); } catch (e) { depuracion = { error: String(e.message || e).slice(0, 200) }; } }
+    // La actividad y los accesos (bitácora) se eliminan el PRIMER MARTES de cada mes (hora de Colombia), con aviso y 2 días para cancelarlo.
+    // Se revisa aunque los correos estén desactivados. Si el aviso no alcanzó a darse 2 días antes, ese mes no se borra nada.
+    const [cfg0] = await db.get('indicadores_configuracion?id=eq.1&select=*');
+    const depuracion = await gestionarDepuracion(db, cfg0, ahoraColombia());
 
-    const [cfg] = await db.get('indicadores_configuracion?id=eq.1&select=*');
+    const cfg = (await db.get('indicadores_configuracion?id=eq.1&select=*'))[0];
     if (!cfg || !cfg.activo) return json({ ok: true, omitido: 'inactivo', depuracion });
     const activos = await resolverActivos(db, env);
 
