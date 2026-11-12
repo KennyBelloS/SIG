@@ -316,6 +316,8 @@ export default function Layout() {
       {cambiandoClave && <CambiarClave onCerrar={() => setCambiandoClave(false)} />}
       {cambiandoNombre && <CambiarNombre actual={sesion?.nombre} email={sesion?.email} onCerrar={() => setCambiandoNombre(false)} />}
       {paleta && <Paleta sesion={sesion} grupos={grupos} onCerrar={() => setPaleta(false)} onClave={() => setCambiandoClave(true)} onNombre={() => setCambiandoNombre(true)} />}
+      {atajos && <Atajos onCerrar={() => setAtajos(false)} />}
+      {idioma && <SelectorIdioma onCerrar={() => setIdiomaAbierto(false)} />}
       {crear && <CrearOverlay origen={crear} sesion={sesion} navegar={navegar} onHoja={setHoja} onCerrar={() => setCrear(null)} />}
       {(hoja === 'pendientes' || hoja === 'nocumplen') && <HojaIndicadores modo={hoja} navegar={navegar} onCerrar={() => setHoja(null)} />}
       {todos.length > 1 && (

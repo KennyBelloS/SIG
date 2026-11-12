@@ -1,3 +1,24 @@
+# =====================================================================
+# SEGURIDAD — se aplican a todas las páginas del sitio.
+# =====================================================================
+/*
+  # La página no se puede meter dentro de un marco en otro sitio: evita que alguien monte una
+  # copia falsa encima y te robe clics o la contraseña (clickjacking).
+  X-Frame-Options: DENY
+  # El navegador respeta el tipo de archivo que declara el servidor y no "adivina" otro.
+  X-Content-Type-Options: nosniff
+  # Al salir hacia otro sitio no se le cuenta la dirección exacta donde estabas.
+  Referrer-Policy: strict-origin-when-cross-origin
+  # Se apagan permisos que esta aplicación no usa: cámara, micrófono, ubicación, pagos y sensores.
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), accelerometer=()
+  # Obliga a usar siempre conexión cifrada (https) durante un año.
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  # De dónde puede cargar cosas la página. Todo lo demás queda bloqueado, así que si alguien
+  # lograra inyectar un script de otro servidor, el navegador no lo ejecutaría.
+  #   'unsafe-inline' en estilos hace falta porque la aplicación calcula algunos colores y tamaños al vuelo.
+  #   connect-src permite hablar con Supabase (la base de datos) y con el propio sitio.
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+
 # La aplicación consulta /version.json para saber si hay una versión nueva: nunca debe quedar guardado.
 /version.json
   Cache-Control: no-store

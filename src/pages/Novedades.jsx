@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import TextoAgua from '../components/TextoAgua';
 import PageHeader from '../components/PageHeader';
 import { traducirError } from '../lib/indicadores';
 import { getNovedades, mesReporteActual, MESES } from '../lib/indicadores';
@@ -109,7 +110,7 @@ export default function Novedades() {
 
           <section className="panel">
             <div className="panel-header">
-              <h2>Comportamiento por área</h2>
+              <h2><TextoAgua>Comportamiento por área</TextoAgua></h2>
               <span className="texto-tenue">Enero a {MESES[(anio === ANIO_ACTUAL ? MES_ACTUAL : 12) - 1]}</span>
             </div>
             <div className="rejilla-areas">

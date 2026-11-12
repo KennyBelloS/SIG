@@ -15,9 +15,12 @@ alter table indicadores add column if not exists tipo_meta text;
 alter table indicadores drop constraint if exists indicadores_tipo_meta_check;
 alter table indicadores add constraint indicadores_tipo_meta_check check (tipo_meta is null or tipo_meta in ('anual','mensual'));
 
--- 2) Tres roles: admin, digitador, usuario -----------------------------
+-- 2) Los roles: admin, digitador, ingeniero, usuario -------------------
+-- OJO: aquí tienen que estar los CUATRO roles desde el principio. Antes esta línea solo permitía
+-- tres y, si ya había alguien con rol «ingeniero», fallaba aquí y abortaba el resto del archivo
+-- (incluida la columna «ultimo_pulso» del despertador, mucho más abajo).
 alter table indicadores_usuarios drop constraint if exists indicadores_usuarios_rol_check;
-alter table indicadores_usuarios add constraint indicadores_usuarios_rol_check check (rol in ('admin','digitador','usuario'));
+alter table indicadores_usuarios add constraint indicadores_usuarios_rol_check check (rol in ('admin','digitador','ingeniero','usuario'));
 
 -- 3) Plan de acción obligatorio ----------------------------------------
 -- NOT VALID: no revisa lo que ya estaba guardado (el histórico del Excel trae meses

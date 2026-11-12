@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import TextoAgua from '../components/TextoAgua';
 import PageHeader from '../components/PageHeader';
 import { traducirError } from '../lib/indicadores';
 import {
@@ -126,7 +127,7 @@ export default function Informe() {
           <header className="informe-cab">
             <img src="/logo-correo.png" alt="Falcon Farms, Finca Torremolinos" className="informe-logo" />
             <div>
-              <h2>{titulo}</h2>
+              <h2><TextoAgua>{titulo}</TextoAgua></h2>
               <p>{nombreProceso}</p>
             </div>
             <div className="informe-meta">Generado el {new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</div>

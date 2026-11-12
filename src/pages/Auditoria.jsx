@@ -1,5 +1,6 @@
 import { etiquetaDeCorreo } from '../lib/acceso';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import TextoAgua from '../components/TextoAgua';
 import PageHeader from '../components/PageHeader';
 import Cargando from '../components/Cargando';
 import Dialogo from '../components/Dialogo';
@@ -306,7 +307,7 @@ function PanelLimpieza({ onBorrado }) {
       {dlg && (
         <Dialogo titulo={MODOS[dlg.modo].boton} onCerrar={() => setDlg(null)} ancho={480}>
           <div className="form-dialogo">
-            <h2>{MODOS[dlg.modo].boton}</h2>
+            <h2><TextoAgua>{MODOS[dlg.modo].boton}</TextoAgua></h2>
             <p>Vas a eliminar {dlg.cuantos == null ? '' : <strong>{dlg.cuantos.toLocaleString('es-CO')} registros de </strong>}{MODOS[dlg.modo].que}. <strong>No se puede deshacer.</strong> Queda anotado quién lo hizo.</p>
             <p className="sub">Si quieres conservarlos, descárgalos en Excel antes.</p>
             <div className="acciones-dialogo">

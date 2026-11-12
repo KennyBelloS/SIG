@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Chart from 'react-apexcharts';
+import TextoAgua from '../components/TextoAgua';
 import PageHeader from '../components/PageHeader';
 import ResumenVivo from '../components/vida/ResumenVivo';
 import { traducirError } from '../lib/indicadores';
@@ -78,7 +79,7 @@ function FichaFila({ fila, ancla, anio, tipo, onCerrar, onAbrir }) {
   return (
     <CartaDesplegable ancla={ancla} titulo={fila.label} ancho={380} alinear="centro" onCerrar={onCerrar}>
       {({ cerrar }) => ({
-        cabecera: <header className="ac-cab"><small className="fr-tipo">{tipo === 'indicadores' ? 'Indicador' : 'Proceso'} · {anio}</small><h2>{fila.label}</h2></header>,
+        cabecera: <header className="ac-cab"><small className="fr-tipo">{tipo === 'indicadores' ? 'Indicador' : 'Proceso'} · {anio}</small><h2><TextoAgua>{fila.label}</TextoAgua></h2></header>,
         cuerpo: (
           <div className="fr-cuerpo">
             <div className="fr-cifras">
@@ -164,7 +165,7 @@ function Acumulado({ d }) {
   return (
     <section className="panel">
       <div className="panel-header">
-        <div><h2>Cumplimiento e incumplimiento acumulado</h2>
+        <div><h2><TextoAgua>Cumplimiento e incumplimiento acumulado</TextoAgua></h2>
           <p className="sub">Sobre {a.esperados} registros esperados, de {MESES_CORTO[d.desde - 1]} a {MESES_CORTO[d.hasta - 1]}. Hay dos formas de incumplir.</p></div>
       </div>
       {a.esperados === 0 ? <p className="texto-tenue">Todavía no hay meses vencidos o con datos en este rango.</p> : (
@@ -204,7 +205,7 @@ function Torta({ d, anio }) {
   return (
     <section className="panel">
       <div className="panel-header">
-        <div><h2>Qué indicadores más nos afectaron</h2>
+        <div><h2><TextoAgua>Qué indicadores más nos afectaron</TextoAgua></h2>
           <p className="sub">Cuánto aporta cada indicador al total de incumplimientos.</p></div>
         <div className="filtros-estado" role="group" aria-label="Tipo de incumplimiento">
           <button className={`filtro-chip ${tipo === 'meta' ? 'filtro-chip-activo' : ''}`} aria-pressed={tipo === 'meta'} onClick={() => setTipo('meta')}>No llegaron a la meta</button>
@@ -414,7 +415,7 @@ export default function Dashboard() {
           <ResumenVivo items={resumenItems} />
           <section className="panel">
             <div className="panel-header">
-              <div><h2>Mapa del año</h2>
+              <div><h2><TextoAgua>Mapa del año</TextoAgua></h2>
                 <p className="sub">{d.filasTipo === 'indicadores' ? `Cada fila es un indicador de ${nombreProceso}; verde cumple la meta y vino no la alcanza.` : 'Porcentaje de indicadores de cada proceso que cumplió su meta cada mes.'}</p></div>
             </div>
             <MapaAnio matriz={d.matriz} anio={anio} tipo={d.filasTipo} />
@@ -434,7 +435,7 @@ export default function Dashboard() {
 
 
           <section className="panel">
-            <div className="panel-header"><h2>Evolución del cumplimiento</h2><span className="sub">{nombreProceso}</span></div>
+            <div className="panel-header"><h2><TextoAgua>Evolución del cumplimiento</TextoAgua></h2><span className="sub">{nombreProceso}</span></div>
             <Chart
               type="area" height={340}
               series={[{ name: 'Cumplimiento', data: d.evolucion.map(e => (e.futuro || e.fuera ? null : e.pct)) }]}
@@ -464,11 +465,11 @@ export default function Dashboard() {
 
           <div className="rejilla-dos">
             <section className="panel">
-              <div className="panel-header"><h2>Requieren atención</h2><Link className="btn-texto" to="/novedades">Ver novedades</Link></div>
+              <div className="panel-header"><h2><TextoAgua>Requieren atención</TextoAgua></h2><Link className="btn-texto" to="/novedades">Ver novedades</Link></div>
               <Ranking lista={d.peores} anio={anio} alerta />
             </section>
             <section className="panel">
-              <div className="panel-header"><h2>Mejor desempeño</h2></div>
+              <div className="panel-header"><h2><TextoAgua>Mejor desempeño</TextoAgua></h2></div>
               <Ranking lista={d.mejores} anio={anio} />
             </section>
           </div>

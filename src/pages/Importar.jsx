@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import TextoAgua from '../components/TextoAgua';
 import PageHeader from '../components/PageHeader';
 import { avisar } from '../lib/toast';
 import { traducirError } from '../lib/indicadores';
@@ -86,7 +87,7 @@ function ImportarMes({ selectorModo }) {
         <li className="paso">
           <span className="paso-n">1</span>
           <div className="paso-cuerpo">
-            <h2>Descarga la plantilla</h2>
+            <h2><TextoAgua>Descarga la plantilla</TextoAgua></h2>
             <p>Trae los indicadores del mes ya listados; tú solo completas valor, causa y plan de acción.</p>
             <div className="cabecera-acciones">
               <select aria-label="Mes" value={mes} onChange={e => setMes(Number(e.target.value))}>{MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select>
@@ -98,7 +99,7 @@ function ImportarMes({ selectorModo }) {
         <li className="paso">
           <span className="paso-n">2</span>
           <div className="paso-cuerpo">
-            <h2>Sube el archivo completado</h2>
+            <h2><TextoAgua>Sube el archivo completado</TextoAgua></h2>
             <p>Solo se aceptan archivos <strong>.xlsx</strong> de hasta 5 MB. Antes de guardar nada verás una vista previa.</p>
             <input ref={entrada} id="archivo-excel" type="file" accept=".xlsx" onChange={elegir} className="sr-only" disabled={!base || leyendo} />
             <label htmlFor="archivo-excel" className={`btn-primary${!base || leyendo ? ' desactivado' : ''}`} style={{ cursor: 'pointer' }}>
@@ -111,7 +112,7 @@ function ImportarMes({ selectorModo }) {
 
       {resultado && (
         <section className="panel" role="status">
-          <div className="panel-header"><h2>Importación terminada</h2></div>
+          <div className="panel-header"><h2><TextoAgua>Importación terminada</TextoAgua></h2></div>
           <div className="aviso aviso-ok"><i className="fa-solid fa-circle-check"></i><span>
             {resultado.guardadas > 0 && <>Se guardaron <strong>{resultado.guardadas}</strong> registros. </>}
             {resultado.creados > 0 && <>Se crearon <strong>{resultado.creados}</strong> indicadores nuevos. </>}
@@ -129,7 +130,7 @@ function ImportarMes({ selectorModo }) {
       {vista && (
         <section className="panel">
           <div className="panel-header">
-            <h2>3. Revisa antes de guardar</h2>
+            <h2><TextoAgua>3. Revisa antes de guardar</TextoAgua></h2>
             {vista.nuevos.length > 0 && (
               <div className="filtros-estado" role="tablist">
                 <button role="tab" aria-selected={pestana === 'registros'} className={`filtro-chip ${pestana === 'registros' ? 'filtro-chip-activo' : ''}`} onClick={() => setPestana('registros')}>Registros ({vista.registros.length})</button>

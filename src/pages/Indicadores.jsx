@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSesion } from '../lib/useSesion';
+import TextoAgua from '../components/TextoAgua';
 import Asomar from '../components/Asomar';
 import PageHeader from '../components/PageHeader';
 import MapaMes from '../components/MapaMes';
@@ -179,7 +180,7 @@ function ProcesoPanel({ proceso, indicadores, registros, statsPorIndicador, regi
       <button className="ind-proceso-header" onClick={() => setAbierto(a => !a)} aria-expanded={abierto}>
         <div className="ind-proceso-titulo">
           <i className={`fa-solid ${abierto ? 'fa-chevron-down' : 'fa-chevron-right'}`}></i>
-          <h2>{proceso.nombre}</h2>
+          <h2><TextoAgua>{proceso.nombre}</TextoAgua></h2>
           <span className="ind-proceso-conteo">{indicadores.length} indicador{indicadores.length !== 1 ? 'es' : ''}</span>
         </div>
         <div className="ind-proceso-resumen">

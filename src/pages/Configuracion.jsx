@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
+import TextoAgua from '../components/TextoAgua';
 import PageHeader from '../components/PageHeader';
 import { avisar } from '../lib/toast';
 import { crearUsuario, crearAcceso, nuevoPinDeUsuario, cambiarClaveDeUsuario, quitarUsuario, generarClave, formatearPin } from '../lib/usuarios';
@@ -145,7 +146,7 @@ function PestanaCierres() {
   return (
     <section className="panel">
       <div className="panel-header">
-        <h2>Cierre mensual</h2>
+        <h2><TextoAgua>Cierre mensual</TextoAgua></h2>
         <select value={anio} onChange={e => setAnio(Number(e.target.value))}>
           {[ANIO_ACTUAL, ANIO_ACTUAL - 1, ANIO_ACTUAL - 2].map(a => <option key={a} value={a}>{a}</option>)}
         </select>
@@ -234,7 +235,7 @@ function EnvioAutomatico({ cfg }) {
   ];
   return (
     <section className="panel envio-auto" aria-label="Envío automático">
-      <div className="panel-header"><div><h2>Envío automático</h2><p className="sub">Los correos salen solos; aquí ves si todo está en marcha.</p></div></div>
+      <div className="panel-header"><div><h2><TextoAgua>Envío automático</TextoAgua></h2><p className="sub">Los correos salen solos; aquí ves si todo está en marcha.</p></div></div>
       <div className={`aviso ${mensajes[0]}`} role="status" style={{ marginTop: 0 }}><i className={`fa-solid ${mensajes[1]}`} /><span>{mensajes[2]}</span></div>
       <ul className="envio-proximos">
         {filas.map(([ic, t, d, quien]) => {
@@ -368,7 +369,7 @@ function PestanaNotificaciones() {
       {mensaje && <div className="aviso aviso-ok" style={{ marginBottom: 14 }}><i className="fa-solid fa-circle-check"></i><span>{mensaje}</span></div>}
 
       <section className="panel">
-        <div className="panel-header"><h2>Calendario de correos automáticos</h2></div>
+        <div className="panel-header"><h2><TextoAgua>Calendario de correos automáticos</TextoAgua></h2></div>
         <p style={{ marginTop: 0 }}>
           Se envían solos, en hora de Colombia: el <strong>día {form.dia_envio}</strong> se recuerda diligenciar el mes en curso a
           <strong> todos los procesos</strong>; <strong>dos días antes del último día</strong> se avisa a quienes aún tienen pendientes; y el
@@ -404,7 +405,7 @@ function PestanaNotificaciones() {
       <EnvioAutomatico cfg={form} />
 
       <section className="panel">
-        <div className="panel-header"><h2>Comprobar que el envío funciona</h2></div>
+        <div className="panel-header"><h2><TextoAgua>Comprobar que el envío funciona</TextoAgua></h2></div>
         <p style={{ marginTop: 0 }}>Este correo se envía siempre, sin importar si hay pendientes. Úsalo para confirmar que el proveedor de correo está bien configurado.</p>
         <div className="ind-form-inline">
           <label style={{ minWidth: 260, flex: 1 }}>Enviar prueba a
@@ -417,7 +418,7 @@ function PestanaNotificaciones() {
       </section>
 
       <section className="panel">
-        <div className="panel-header"><h2>Logo de los correos</h2></div>
+        <div className="panel-header"><h2><TextoAgua>Logo de los correos</TextoAgua></h2></div>
         <p style={{ marginTop: 0 }}>
           El logo se publica automáticamente en tu Supabase la primera vez que se envía un correo.
           Si en Outlook o Gmail no se ve, compruébalo aquí.
@@ -442,7 +443,7 @@ function PestanaNotificaciones() {
       </section>
 
       <section className="panel">
-        <div className="panel-header"><h2>Firma de los correos</h2></div>
+        <div className="panel-header"><h2><TextoAgua>Firma de los correos</TextoAgua></h2></div>
         <p style={{ marginTop: 0 }}>Los correos salen firmados solo con el cargo (sin nombre de persona), junto al logo de Falcon Farms y estos datos de contacto.</p>
         <div className="config-grid-form">
           {campoFirma('firma_cargo', 'Cargo (aparece en negrita)', 'Analista Gestión Integral')}
@@ -458,7 +459,7 @@ function PestanaNotificaciones() {
       </section>
 
       <section className="panel">
-        <div className="panel-header"><h2>Escribir un correo</h2></div>
+        <div className="panel-header"><h2><TextoAgua>Escribir un correo</TextoAgua></h2></div>
         <p style={{ marginTop: 0 }}>Redacta un mensaje libre; se envía con el mismo encabezado y la misma firma que los automáticos.</p>
         <form onSubmit={enviarLibre} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 14 }}>
           <div className="ind-form-fila">
@@ -487,7 +488,7 @@ function PestanaNotificaciones() {
       {historial.length > 0 && (
         <section className="panel">
           <div className="panel-header">
-            <h2>Últimos envíos</h2>
+            <h2><TextoAgua>Últimos envíos</TextoAgua></h2>
             <button type="button" className="btn-texto btn-peligro" onClick={() => setPorEliminarEnvio({ todo: true })}><i className="fa-solid fa-trash-can" aria-hidden="true"></i> Eliminar todo</button>
           </div>
           <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte"><table>
@@ -627,7 +628,7 @@ function PestanaUsuarios() {
   return (
     <>
       <section className="panel">
-        <div className="panel-header"><h2>Qué puede hacer cada rol</h2></div>
+        <div className="panel-header"><h2><TextoAgua>Qué puede hacer cada rol</TextoAgua></h2></div>
         <ul className="roles-lista">
           {Object.entries(ROLES).map(([k, r]) => (
             <li key={k}><span className={`chip-ind ${k === 'admin' ? 'chip-ind-ok' : k === 'digitador' ? 'chip-ind-pendiente' : ''}`} style={k === 'usuario' || k === 'ingeniero' ? { background: 'var(--line-soft)', color: 'var(--ink-2)' } : undefined}>{r.nombre}</span> {r.descripcion}</li>
@@ -716,7 +717,7 @@ function PestanaUsuarios() {
       </section>
 
       <section className="panel">
-        <div className="panel-header"><h2>Usuarios</h2></div>
+        <div className="panel-header"><h2><TextoAgua>Usuarios</TextoAgua></h2></div>
         {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
         {aviso && <div className="aviso aviso-ok" role="status"><i className="fa-solid fa-circle-check" aria-hidden="true"></i><span>{aviso}</span></div>}
         {cargando ? <Cargando filas={4} /> : (
@@ -795,7 +796,7 @@ function NuevoPinDialogo({ usuario, etiqueta, direccion, onCerrar }) {
   return (
     <Dialogo titulo="Nuevo PIN" onCerrar={onCerrar} ancho={480}>
       <div className="form-dialogo">
-        <h2>Nuevo PIN</h2>
+        <h2><TextoAgua>Nuevo PIN</TextoAgua></h2>
         <p style={{ marginTop: -6 }}>Para <strong>{usuario.nombre || etiqueta}</strong> ({etiqueta}).</p>
         {!pin ? (
           <>
@@ -829,7 +830,7 @@ function ProcesosDialogo({ usuario, procesos, onCerrar, onGuardado }) {
   return (
     <Dialogo titulo="Procesos del ingeniero" onCerrar={onCerrar} ancho={520}>
       <div className="form-dialogo">
-        <h2>Procesos a cargo</h2>
+        <h2><TextoAgua>Procesos a cargo</TextoAgua></h2>
         <p style={{ marginTop: -6 }}>De <strong>{usuario.nombre || usuario.identificador}</strong>. Los verá primero en su inicio.</p>
         <div className="procesos-chips">{procesos.map(p => <button key={p.id} type="button" role="checkbox" aria-checked={sel.includes(p.id)} className={`proceso-chip${sel.includes(p.id) ? ' on' : ''}`} onClick={() => alternar(p.id)}>{p.nombre}</button>)}</div>
         {error && <div className="alert danger" role="alert"><i className="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
@@ -857,7 +858,7 @@ function NuevaClaveDialogo({ usuario, onCerrar }) {
   return (
     <Dialogo titulo="Nueva contraseña" onCerrar={onCerrar} ancho={500}>
       <form className="form-dialogo" onSubmit={guardar} noValidate>
-        <h2>Nueva contraseña</h2>
+        <h2><TextoAgua>Nueva contraseña</TextoAgua></h2>
         <p style={{ marginTop: -6 }}>Para <strong>{usuario.email}</strong>.</p>
         {!hecho ? (
           <>

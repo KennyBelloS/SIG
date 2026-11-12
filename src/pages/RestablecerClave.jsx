@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import TextoAgua from '../components/TextoAgua';
 import { cambiarMiClave } from '../lib/usuarios';
 import { traducirError } from '../lib/indicadores';
 
@@ -36,7 +37,7 @@ export default function RestablecerClave() {
             <form className="entrada-form ent2-form" onSubmit={guardar} noValidate>
               <header>
                 <p className="entrada-saludo">Casi listo</p>
-                <h2>Crea tu nueva contraseña</h2>
+                <h2><TextoAgua>Crea tu nueva contraseña</TextoAgua></h2>
                 <p>Elige una que no uses en otros sitios. Con ella entrarás desde ahora.</p>
               </header>
               <label htmlFor="nueva-clave">Contraseña nueva

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import TextoAgua from '../components/TextoAgua';
 import PageHeader from '../components/PageHeader';
 import { Confirmar } from '../components/Dialogo';
 import { avisar } from '../lib/toast';
@@ -119,7 +120,7 @@ export default function ImportarLibro({ selectorModo }) {
 
       {!libro && (
         <section className="panel">
-          <div className="panel-header"><div><h2>1. Elige el libro</h2><p className="sub">El archivo «Indicadores de Gestión» tal como lo tienes: hoja «Indicadores» y una hoja por indicador.</p></div></div>
+          <div className="panel-header"><div><h2><TextoAgua>1. Elige el libro</TextoAgua></h2><p className="sub">El archivo «Indicadores de Gestión» tal como lo tienes: hoja «Indicadores» y una hoja por indicador.</p></div></div>
           <div className="import-subir">
             <button type="button" className="btn-primary" onClick={() => entrada.current?.click()} disabled={leyendo || !base}>
               <i className={`fa-solid ${leyendo ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} aria-hidden="true"></i> {leyendo ? 'Leyendo el libro…' : 'Elegir el libro (.xlsx)'}

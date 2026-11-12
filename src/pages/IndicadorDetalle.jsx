@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { anotarReciente } from '../lib/recientes';
 import { useSesion } from '../lib/useSesion';
+import TextoAgua from '../components/TextoAgua';
 import IndicadorChart, { TendenciaChart } from '../components/IndicadorChart';
 import PageHeader from '../components/PageHeader';
 import TablaMeses from '../components/TablaMeses';
@@ -322,7 +323,7 @@ export default function IndicadorDetalle() {
 
       <section className="panel">
         <div className="panel-header">
-          <h2>Meta y resultado</h2>
+          <h2><TextoAgua>Meta y resultado</TextoAgua></h2>
         </div>
         <div className="controles-grafica" role="group" aria-label="Opciones de la gráfica">
           <label className="filtro-etq">Comparar el indicador contra
@@ -359,13 +360,13 @@ export default function IndicadorDetalle() {
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div><h2>Tendencia</h2><p className="sub">Hacia dónde va el indicador en los meses elegidos.</p></div></div>
+        <div className="panel-header"><div><h2><TextoAgua>Tendencia</TextoAgua></h2><p className="sub">Hacia dónde va el indicador en los meses elegidos.</p></div></div>
         <TendenciaChart indicador={indicador} registros={registros} desde={desdeG} hasta={hastaG} />
       </section>
 
       <section className="panel">
         <div className="panel-header">
-          <h2>Análisis y plan de acción</h2>
+          <h2><TextoAgua>Análisis y plan de acción</TextoAgua></h2>
         </div>
         <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Tabla desplazable: usa las flechas del teclado para moverte"><table className="tabla-apilable">
           <thead><tr><th>Mes</th><th>Valor</th><th>Meta</th><th>Desviación</th><th>Estado</th><th>Análisis</th><th>Plan de acción</th><th></th></tr></thead>

@@ -40,7 +40,7 @@ export default function TextoAgua({ children, className = '', as: Tag = 'span' }
     <Tag ref={caja} className={`texto-agua ${className}`} onPointerMove={mover} onPointerLeave={salir}>
       {texto.split('').map((c, i) => (
         c === ' '
-          ? <span key={i} className="ta-esp"> </span>
+          ? <span key={i} className="ta-esp">{'\u00a0'}</span>
           : <span key={i} className="ta-l" style={{ '--k': 0 }} aria-hidden="true">{c}</span>
       ))}
       <span className="sr-only">{texto}</span>

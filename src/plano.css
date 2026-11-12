@@ -821,7 +821,9 @@ html[data-tema="oscuro"] ::selection{ background:rgba(240,194,90,.35); color:#ff
 .atajos-pie{ padding:var(--s-3) var(--s-5) var(--s-5); font-size:calc(12.5px * var(--esc,1)); color:var(--ink-3); border-top:1px solid var(--line); }
 
 /* ---------- gota de agua sobre el texto ---------- */
-.texto-agua{ display:inline-block; }
+/* OJO: aquí NO se toca «display». Al aplicarse sobre un h1/h2 (que son de bloque), forzar
+   inline-block los ponía uno al lado del otro en vez de uno debajo del otro. */
+.texto-agua{ }
 .texto-agua .ta-l{
   display:inline-block;
   /* --k va de 0 (lejos del cursor) a 1 (justo debajo): la letra se levanta, crece y aclara */
@@ -831,7 +833,9 @@ html[data-tema="oscuro"] ::selection{ background:rgba(240,194,90,.35); color:#ff
   transition:transform .32s cubic-bezier(.2,.9,.25,1), text-shadow .32s ease, filter .32s ease;
   will-change:transform;
 }
-.texto-agua .ta-esp{ display:inline-block; }
+/* el espacio entre palabras: sin «white-space:pre» el navegador se lo come y las palabras
+   quedan pegadas («Matrizdeindicadores»). */
+.texto-agua .ta-esp{ display:inline-block; white-space:pre; }
 /* en pantalla táctil no hay «pasar por encima»: se deja el texto quieto */
 @media (hover:none), (prefers-reduced-motion:reduce){ .texto-agua .ta-l{ transform:none !important; text-shadow:none !important; filter:none !important; } }
 

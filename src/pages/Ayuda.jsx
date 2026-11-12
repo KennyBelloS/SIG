@@ -1,5 +1,6 @@
 import { rolDeAyuda } from '../lib/acceso';
 import { useEffect, useMemo, useState } from 'react';
+import TextoAgua from '../components/TextoAgua';
 import PageHeader from '../components/PageHeader';
 import { useSesion } from '../lib/useSesion';
 import { ROLES } from '../lib/indicadores';
@@ -96,7 +97,7 @@ export default function Ayuda() {
       <div id="conectado" className="ay-seccion no-imprimir-ayuda"><MapaConectado rol={rol} /></div>
 
       <div id="guias" className="ay-seccion">
-        <div className="ay-titulo"><div><h2>Guías paso a paso</h2><p>{rol === 'admin' ? 'Todas, ordenadas por quién las hace.' : `Las que corresponden a tu rol (${ROLES[rol]?.nombre}).`}</p></div></div>
+        <div className="ay-titulo"><div><h2><TextoAgua>Guías paso a paso</TextoAgua></h2><p>{rol === 'admin' ? 'Todas, ordenadas por quién las hace.' : `Las que corresponden a tu rol (${ROLES[rol]?.nombre}).`}</p></div></div>
         {rol === 'admin'
           ? GRUPOS.map(([nv, titulo, nota]) => {
             const lista = guias.filter(g => nivel(g) === nv);
@@ -112,14 +113,14 @@ export default function Ayuda() {
       </div>
 
       <section id="glosario" className="ay-seccion panel">
-        <div className="panel-header"><div><h2>Glosario</h2><p className="sub">Las palabras que más se usan, en lenguaje sencillo.</p></div></div>
+        <div className="panel-header"><div><h2><TextoAgua>Glosario</TextoAgua></h2><p className="sub">Las palabras que más se usan, en lenguaje sencillo.</p></div></div>
         <dl className="ay-glosario">{glosario.map(([t, d]) => <div key={t}><dt>{t}</dt><dd>{d}</dd></div>)}</dl>
       </section>
 
       <div id="pruebas" className="ay-seccion no-imprimir-ayuda"><PruebasGuiadas rol={rol} /></div>
 
       <section id="faq" className="ay-seccion panel">
-        <div className="panel-header"><h2>Preguntas frecuentes</h2></div>
+        <div className="panel-header"><h2><TextoAgua>Preguntas frecuentes</TextoAgua></h2></div>
         <div className="ay-faq">{faq.map(([q, a]) => <details key={q}><summary>{q}</summary><p>{a}</p></details>)}</div>
         <p className="texto-tenue" style={{ marginTop: 16 }}>¿Algo no está claro? Pregúntale al Analista de Gestión Integral: el texto de cada regla vive en un solo archivo y se puede ajustar.</p>
       </section>
