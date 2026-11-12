@@ -1,12 +1,14 @@
 import Numero from './Numero';
+import TextoAgua from './TextoAgua';
+import { t as tr } from '../lib/idioma';
 
 /** Cajetín de la página: como el recuadro de título de un plano. Lleva el título, una frase de contexto,
  *  los controles de la pantalla (periodo, exportar…) y, si hay, las cifras que resumen lo que se ve. */
 export default function PageHeader({ titulo, descripcion, children, cifras }) {
   return (
     <header className="cajetin">
-      <h1 className={String(titulo).length > 16 || String(titulo).split(/\s+/).some(p => p.length >= 12) ? 'largo' : undefined}>{titulo}</h1>
-      {descripcion && <p className="cajetin-desc">{descripcion}</p>}
+      <h1 className={String(titulo).length > 16 || String(titulo).split(/\s+/).some(p => p.length >= 12) ? 'largo' : undefined}><TextoAgua>{tr(titulo)}</TextoAgua></h1>
+      {descripcion && <p className="cajetin-desc">{tr(descripcion)}</p>}
       {children && <div className="cajetin-controles">{children}</div>}
       {cifras && cifras.length > 0 && (
         <dl className="cajetin-cifras">

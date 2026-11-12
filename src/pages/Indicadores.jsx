@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSesion } from '../lib/useSesion';
+import Asomar from '../components/Asomar';
 import PageHeader from '../components/PageHeader';
 import MapaMes from '../components/MapaMes';
 import { traducirError } from '../lib/indicadores';
@@ -195,7 +196,7 @@ function ProcesoPanel({ proceso, indicadores, registros, statsPorIndicador, regi
             <tbody>
               {filas.map(({ ind, reg, estado }) => (
                 <tr key={ind.id}>
-                  <td className="celda-principal"><span className="nombre-ind">{ind.categoria && <i className="punto-cat" title={`Categoría: ${ind.categoria}`} style={{ background: ind.color_categoria }} />}{ind.nombre}</span></td>
+                  <td className="celda-principal"><Asomar id={ind.id}><span className="nombre-ind" title="Mantén presionado para asomarte">{ind.categoria && <i className="punto-cat" title={`Categoría: ${ind.categoria}`} style={{ background: ind.color_categoria }} />}{ind.nombre}</span></Asomar></td>
                   <td data-label="Responsable">{ind.responsable_medicion || '—'}</td>
                   <td data-label="Meta" className="celda-numero">{formatearMeta(ind)}</td>
                   <td data-label={`${MESES[mes - 1]} ${anio}`} className="celda-numero">{formatearValor(ind, reg?.valor)}</td>

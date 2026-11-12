@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getIndicadores, getProcesos } from '../lib/indicadores';
 import { normalizar } from '../lib/libro';
 import { cerrarSesion } from '../lib/useSesion';
+import { leerRecientes, anotarReciente } from '../lib/recientes';
 
 /** Buscador de toda la aplicación (Ctrl/⌘ + K o «/»): salta a una sección, a cualquiera de los indicadores o a una acción de la cuenta.
  *  Patrón de accesibilidad: combobox con lista de opciones; el foco se queda en el campo y la opción activa se anuncia. */
@@ -39,10 +40,16 @@ export default function Paleta({ grupos, onCerrar, onClave, onNombre }) {
       { clave: 'a-clave', grupo: 'Mi cuenta', icono: 'fa-key', texto: 'Cambiar mi contraseña', sub: '', accion: onClave },
       { clave: 'a-salir', grupo: 'Mi cuenta', icono: 'fa-right-from-bracket', texto: 'Cerrar sesión', sub: '', accion: cerrarSesion },
     ].map(o => ({ ...o, p: puntaje(o.texto) })).filter(o => o.p);
+    const abrir = i => { anotarReciente({ id: i.id, nombre: i.nombre, proceso: i.proceso }); navegar(`/indicadores/${i.id}`); };
     const inds = t.length >= 1
-      ? indicadores.map(i => ({ clave: `i-${i.id}`, grupo: 'Indicadores', icono: 'fa-chart-simple', texto: i.nombre, sub: i.proceso, accion: () => navegar(`/indicadores/${i.id}`), p: i.texto.includes(t) ? (i.texto.startsWith(t) ? 3 : 2) : 0 })).filter(o => o.p).sort((a, b) => b.p - a.p).slice(0, 8)
+      ? indicadores.map(i => ({ clave: `i-${i.id}`, grupo: 'Indicadores', icono: 'fa-chart-simple', texto: i.nombre, sub: i.proceso, accion: () => abrir(i), p: i.texto.includes(t) ? (i.texto.startsWith(t) ? 3 : 2) : 0 })).filter(o => o.p).sort((a, b) => b.p - a.p).slice(0, 8)
       : [];
-    return [...paginas.sort((a, b) => b.p - a.p), ...inds, ...acciones.sort((a, b) => b.p - a.p)];
+    // sin nada escrito, lo primero que se ofrece es dónde venías trabajando
+    const recientes = t ? [] : leerRecientes().slice(0, 5).map(r => ({
+      clave: `r-${r.id}`, grupo: 'Seguir donde ibas', icono: 'fa-clock-rotate-left', texto: r.nombre, sub: r.proceso,
+      accion: () => abrir({ id: r.id, nombre: r.nombre, proceso: r.proceso }), p: 1,
+    }));
+    return [...recientes, ...paginas.sort((a, b) => b.p - a.p), ...inds, ...acciones.sort((a, b) => b.p - a.p)];
   }, [q, grupos, indicadores, navegar, onClave, onNombre]);
 
   useEffect(() => { setActivo(0); }, [q]);

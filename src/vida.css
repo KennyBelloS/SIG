@@ -102,7 +102,7 @@ body{ font-size:calc(18px * var(--esc,1)); }
 /* ---------- modo oscuro: el cambio se revela como un círculo ---------- */
 ::view-transition-old(root), ::view-transition-new(root){ animation:none; mix-blend-mode:normal; } ::view-transition-new(root){ z-index:2; } ::view-transition-old(root){ z-index:1; }
 html[data-tema="oscuro"]{ filter:invert(1) hue-rotate(180deg) brightness(.94) contrast(.96); background:#fff; color-scheme:dark; }
-html[data-tema="oscuro"] :is(img, video, canvas, iframe, .logo-ficha, .rosal, .entrada-campo, .entrada-anim-campo, .abeja, .vuelo-nave, .it-logo){ filter:invert(1) hue-rotate(180deg) brightness(1.06) contrast(1.04); }
+html[data-tema="oscuro"] :is(img, video, canvas, iframe, .logo-ficha, .rosal, .entrada-campo, .abeja, .vuelo-nave, .it-logo){ filter:invert(1) hue-rotate(180deg) brightness(1.06) contrast(1.04); }
 .tema-caja{ position:relative; width:210px; height:130px; margin:0 auto; user-select:none; }
 .tema-caja svg{ position:absolute; inset:0; overflow:visible; } .tema-ranura-sombra{ fill:none; stroke:rgba(0,0,0,.16); stroke-width:20px; stroke-linecap:round; transform:translateY(3px); } .tema-ranura{ fill:none; stroke:rgba(15,61,34,.16); stroke-width:18px; stroke-linecap:round; } .tema-brillo{ fill:none; stroke:var(--f-500); stroke-width:7px; stroke-linecap:round; opacity:.85; filter:blur(3px); }
 .tema-sol, .tema-luna{ position:absolute; font-size:calc(15px * var(--esc,1)); color:var(--ink-3); } .tema-sol{ left:8px; top:4px; } .tema-luna{ right:2px; bottom:6px; }
@@ -115,7 +115,7 @@ html[data-tema="oscuro"] :is(img, video, canvas, iframe, .logo-ficha, .rosal, .e
 html[data-tema="oscuro"] :is(.mast, .mv-tabs, .crear, .tour-modal, .entrada-anim, .entrada-marca, .isla-aviso, .disp-marco, .tema-perilla, .mv-fab, .mast-crear, .aviso-version){ filter:invert(1) hue-rotate(180deg) brightness(1.07) contrast(1.04); }
 
 /* ---------- marcos de dispositivo ---------- */
-.disp{ position:relative; margin:0 auto; } .escala-caja{ position:relative; width:100%; overflow:hidden; } .escala-int{ transform-origin:top left; }
+.disp{ position:relative; margin:0 auto; container-type:inline-size; } .escala-caja{ position:relative; width:100%; overflow:hidden; } .escala-int{ transform-origin:top left; }
 .disp-marco{ position:relative; background:#0c0e0d; box-shadow:0 0 0 2px #2b302d, 0 0 0 5px #141716, 0 44px 72px -30px rgba(7,30,15,.72), inset 0 0 0 1.5px #3b413d; }
 .disp-pantalla{ position:relative; overflow:hidden; background:var(--canvas); }
 .disp-iphone{ width:min(276px,100%); } .disp-iphone .disp-marco{ padding:10px; border-radius:46px; } .disp-iphone .disp-pantalla{ aspect-ratio:9/19; border-radius:36px; }
@@ -386,6 +386,12 @@ body.movil .im-proceso-cab p{ font-size:calc(15px * var(--esc,1)); } body.movil 
 .pv-pantalla{ position:absolute; inset:0; display:flex; flex-direction:column; background:var(--canvas); } .pv-lienzo{ flex:1; min-height:0; overflow:hidden; display:flex; align-items:center; justify-content:center; animation:pv-entra .7s var(--curva) both; } @keyframes pv-entra{ from{ opacity:0; transform:translateX(34px) scale(.98); } }
 .pv-pie{ flex:none; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:5px 12px 8px; background:rgba(255,255,255,.7); border-top:1px solid var(--line); } .pv-etq{ font:italic 500 calc(15px * var(--esc,1)) var(--serif); color:var(--f-900); } .pv-iphone .pv-pie, .pv-android .pv-pie{ padding-bottom:16px; }
 .pv-puntos{ display:flex; gap:6px; } .pv-puntos button{ width:9px; height:9px; min-height:0; padding:0; border-radius:5px; background:var(--line-strong); transition:width .4s var(--curva-resorte), background .3s; } .pv-puntos button.on{ width:24px; background:var(--f-800); }
+/* dentro del teléfono todo se mide contra SU ancho: si no, en el celular el texto se parte en varias
+   líneas y el pie se come media pantalla (que es justo lo que pasaba). */
+.disp-iphone .pv-pie, .disp-android .pv-pie{ gap:2cqw; padding:1.8cqw 4.4cqw 5.8cqw; }
+.disp-iphone .pv-etq, .disp-android .pv-etq{ font-size:5.4cqw; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.disp-iphone .pv-puntos, .disp-android .pv-puntos{ gap:2.2cqw; flex:none; }
+.disp-iphone .pv-puntos button, .disp-android .pv-puntos button{ width:3.3cqw; height:3.3cqw; border-radius:50%; } .disp-iphone .pv-puntos button.on, .disp-android .pv-puntos button.on{ width:8.7cqw; border-radius:2cqw; }
 .pv-esc{ width:560px; padding:22px 24px; display:grid; gap:12px; align-content:start; font-size:13px; } .pv-iphone .pv-esc, .pv-android .pv-esc{ width:340px; padding:40px 16px 10px; gap:8px; }
 .pv-barra-sup{ display:flex; align-items:center; gap:8px; } .pv-logo{ width:26px; height:26px; border-radius:8px; background:#fff; display:grid; place-items:center; box-shadow:0 4px 8px -4px rgba(15,61,34,.5); } .pv-logo img{ width:20px; height:20px; } .pv-barra-sup b{ font:600 16px var(--serif); color:var(--f-900); flex:1; } .pv-barra-sup b i{ font-weight:500; color:var(--ink-3); }
 .pv-esc h4{ font:600 34px/1 var(--serif); color:var(--f-900); animation:revela .6s var(--curva) .1s both; } .pv-esc h4 i{ font-weight:500; color:var(--ink-3); }
@@ -477,28 +483,26 @@ body.movil .hoja, .hoja{ background:linear-gradient(180deg,#F8F6EE,#F2F5EF); -we
 .mock-isla span{ font-size:10.5px; } .mock-isla > i{ font-size:11px; }
 
 /* el iPhone: bisel de titanio, bordes concéntricos, botones laterales y reflejo en el cristal */
-.disp-iphone .disp-marco{ padding:7px; border-radius:50px; background:#050606; box-shadow:0 0 0 1.5px #5e6663, 0 0 0 3.5px #cfd5d2, 0 0 0 5px #858d8a, 0 0 0 6px #4a504e, 0 46px 74px -30px rgba(7,30,15,.75), inset 0 0 0 1px #2c312f; }
-.disp-iphone .disp-pantalla{ border-radius:43px; aspect-ratio:9/19.5; }
-.disp-iphone .disp-marco::before{ content:''; position:absolute; left:-9px; top:17%; width:3px; height:5.2%; border-radius:2px 0 0 2px; background:linear-gradient(90deg,#6b7370,#c9cfcc); box-shadow:0 52px 0 #aab1ae, 0 -34px 0 #aab1ae; }
-.disp-iphone .disp-marco::after{ content:''; position:absolute; right:-9px; top:26%; width:3px; height:8%; border-radius:0 2px 2px 0; background:linear-gradient(270deg,#6b7370,#c9cfcc); }
+/* TODO en «cqw» (1cqw = 1% del ancho del propio teléfono): así el marco conserva exactamente la misma
+   forma lo mismo a 276px que a 100px. Con píxeles fijos, al achicarse el radio se comía el ancho y el
+   teléfono se veía como una píldora ovalada. */
+.disp-iphone .disp-marco{ padding:2.6cqw; border-radius:18cqw; background:#050606; box-shadow:0 0 0 .55cqw #5e6663, 0 0 0 1.3cqw #cfd5d2, 0 0 0 1.8cqw #858d8a, 0 0 0 2.2cqw #4a504e, 0 16cqw 27cqw -11cqw rgba(7,30,15,.75), inset 0 0 0 .36cqw #2c312f; }
+.disp-iphone .disp-pantalla{ border-radius:15.5cqw; aspect-ratio:9/19.5; }
+.disp-iphone .disp-marco::before{ content:''; position:absolute; left:-3.3cqw; top:17%; width:1.1cqw; height:5.2%; border-radius:.7cqw 0 0 .7cqw; background:linear-gradient(90deg,#6b7370,#c9cfcc); box-shadow:0 18.8cqw 0 #aab1ae, 0 -12.3cqw 0 #aab1ae; }
+.disp-iphone .disp-marco::after{ content:''; position:absolute; right:-3.3cqw; top:26%; width:1.1cqw; height:8%; border-radius:0 .7cqw .7cqw 0; background:linear-gradient(270deg,#6b7370,#c9cfcc); }
 .disp-isla{ top:2.3%; width:27%; height:auto; aspect-ratio:3.4/1; margin-left:0; left:50%; transform:translateX(-50%); border-radius:999px; background:#000; box-shadow:0 0 0 1px rgba(255,255,255,.04); } .disp-isla i{ right:11%; top:50%; width:11%; height:auto; aspect-ratio:1; transform:translateY(-50%); }
 .disp-pantalla::after{ content:''; position:absolute; inset:0; z-index:12; pointer-events:none; background:linear-gradient(115deg,rgba(255,255,255,.13),rgba(255,255,255,0) 34%); }
-.disp-estado{ position:absolute; top:0; left:0; right:0; z-index:10; display:flex; justify-content:space-between; align-items:center; padding:3.6% 7% 0; font:600 11px -apple-system,'Helvetica Neue',Arial,sans-serif; color:#0c0e0d; letter-spacing:-.01em; }
-.disp-estado-ico{ display:flex; align-items:center; gap:5px; font-size:10px; }
+.disp-estado{ position:absolute; top:0; left:0; right:0; z-index:10; display:flex; justify-content:space-between; align-items:center; padding:3.6% 7% 0; font:600 4cqw -apple-system,'Helvetica Neue',Arial,sans-serif; color:#0c0e0d; letter-spacing:-.01em; }
+.disp-estado-ico{ display:flex; align-items:center; gap:1.8cqw; font-size:3.6cqw; }
 .disp-android .disp-estado{ padding-top:2.8%; }
-.disp-barra-inicio{ bottom:1.6%; width:34%; margin-left:0; left:50%; transform:translateX(-50%); height:4px; background:rgba(0,0,0,.5); }
-.disp-android .disp-marco{ padding:7px; border-radius:34px; box-shadow:0 0 0 1.5px #5e6663, 0 0 0 3px #b9c0bd, 0 40px 66px -30px rgba(7,30,15,.7), inset 0 0 0 1px #2c312f; } .disp-android .disp-pantalla{ border-radius:27px; }
+.disp-barra-inicio{ bottom:1.6%; width:34%; margin-left:0; left:50%; transform:translateX(-50%); height:1.45cqw; min-height:2px; border-radius:1cqw; background:rgba(0,0,0,.5); }
+.disp-android .disp-marco{ padding:2.6cqw; border-radius:12.7cqw; box-shadow:0 0 0 .55cqw #5e6663, 0 0 0 1.1cqw #b9c0bd, 0 15cqw 24cqw -11cqw rgba(7,30,15,.7), inset 0 0 0 .36cqw #2c312f; } .disp-android .disp-pantalla{ border-radius:10cqw; }
 
 /* nuevo indicador en el celular: las pestañas van en una sola fila que se desliza */
 @media (max-width:900px){ .editor-pestanas{ flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; gap:2px; } .editor-pestanas::-webkit-scrollbar{ display:none; } .editor-pestanas button{ white-space:nowrap; flex:none; padding:10px 12px; } .editor-cab h2{ font-size:calc(30px * var(--esc,1)); } }
 .editor-vacio{ display:grid; justify-items:center; gap:8px; text-align:center; padding:26px 12px; color:var(--ink-2); } .editor-vacio i{ font-size:34px; color:var(--f-800); animation:pulso-aviso 2.4s ease-in-out infinite; }
 
 /* ---------- entrada al sistema (nueva) ---------- */
-.entrada-anim-centro{ margin-top:-6vh; display:grid; justify-items:center; gap:6px; }
-.ea-logo{ position:relative; width:clamp(104px,15vh,136px); height:clamp(104px,15vh,136px); display:grid; place-items:center; }
-.ea-logo .entrada-anim-logo{ width:76%; height:76%; border-radius:22px; animation:logo-entra .7s var(--curva-resorte) both; }
-.ea-anillo{ position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); } .ea-pista{ fill:none; stroke:rgba(255,255,255,.14); stroke-width:3; } .ea-trazo{ fill:none; stroke:var(--gold); stroke-width:3.4; stroke-linecap:round; stroke-dasharray:100; stroke-dashoffset:100; animation:ea-dibuja 1.55s var(--curva) .15s forwards; } @keyframes ea-dibuja{ to{ stroke-dashoffset:0; } }
-.entrada-anim-titulo{ font:600 calc(clamp(40px,7vh,72px) * var(--esc,1))/.95 var(--serif); } .entrada-anim-hola{ font-size:calc(clamp(15px,2.2vh,19px) * var(--esc,1)); }
 
 
 /* ---------- «Más»: buscador, atajos, preferencias ---------- */

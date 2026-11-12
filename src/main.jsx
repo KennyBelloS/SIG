@@ -11,8 +11,10 @@ import './vida.css';
 import { inicializarTema } from './lib/tema';
 import { iniciarVida } from './lib/vida';
 import { iniciarPreferencias } from './lib/preferencias';
+import { iniciarIdioma } from './lib/idioma';
 
 iniciarPreferencias();
+iniciarIdioma();
 inicializarTema();
 iniciarVida();
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { anotarReciente } from '../lib/recientes';
 import { useSesion } from '../lib/useSesion';
 import IndicadorChart, { TendenciaChart } from '../components/IndicadorChart';
 import PageHeader from '../components/PageHeader';
@@ -55,6 +56,8 @@ export default function IndicadorDetalle() {
       ]);
       setDiaCierre(cfg?.dia_cierre ?? 15);
       setIndicador(ind);
+      // queda anotado para ofrecerlo en el buscador como «seguir donde ibas»
+      anotarReciente({ id: ind.id, nombre: ind.nombre, proceso: procesos.find(p => p.id === ind.proceso_id)?.nombre || '' });
       setRegistros(regsMulti.filter(r => r.anio === anio));
       setRegistrosComparacion(comparar ? regsMulti.filter(r => r.anio === Number(comparar)) : []);
       setRegistrosAnterior(regsMulti.filter(r => r.anio === anio - 1));

@@ -223,7 +223,7 @@ function EnvioAutomatico({ cfg }) {
   const dias = horas != null ? Math.floor(horas / 24) : 0;
   const mensajes = {
     ok: ['aviso-ok', 'fa-circle-check', `El despertador está funcionando: llamó ${horas < 1 ? 'hace menos de una hora' : horas < 24 ? `hace ${Math.floor(horas)} h` : 'ayer'} (${pulso?.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}).`],
-    nunca: ['aviso-alerta', 'fa-triangle-exclamation', 'El despertador todavía no ha llamado nunca. Si ya publicaste la aplicación, falta crear los secretos APP_URL y CRON_SECRET en GitHub (Settings → Secrets → Actions) y probar con "Run workflow" en la pestaña Actions.'],
+    nunca: ['aviso-alerta', 'fa-triangle-exclamation', 'El despertador todavía no ha llamado. Si ya creaste los secretos en GitHub y el flujo sale en verde, lo más probable es que falte ejecutar el SQL de la versión nueva en Supabase → SQL Editor (sin la columna «ultimo_pulso» este aviso no se apaga nunca). Para saberlo con certeza: GitHub → Actions → "Run workflow", abre la ejecución y lee la respuesta: ahí dice «latido».'],
     atrasado: ['aviso-error', 'fa-circle-exclamation', `El despertador lleva ${dias} día${dias === 1 ? '' : 's'} sin llamar. Revisa en GitHub → Actions si el flujo está fallando o desactivado. Los envíos de este mes no saldrán hasta que vuelva a llamar.`],
     apagado: ['aviso-info', 'fa-circle-pause', 'Los envíos automáticos están desactivados. Activa la casilla "Envíos activos" y guarda.'],
   }[estado];
@@ -267,13 +267,22 @@ function PestanaNotificaciones() {
   const [revisandoLogo, setRevisandoLogo] = useState(false);
   const [porEliminarEnvio, setPorEliminarEnvio] = useState(null);   // null | { id } (uno) | { todo: true }
   const [eliminandoEnvio, setEliminandoEnvio] = useState(false);
+  const [yendose, setYendose] = useState(null);   // id de la fila que está haciendo la animación de irse
 
   async function eliminarEnvios() {
     if (!porEliminarEnvio) return;
     setEliminandoEnvio(true);
     try {
       if (porEliminarEnvio.todo) { await eliminarHistorialNotificaciones(); setHistorial([]); avisar('Se eliminó todo el historial de envíos.', { tipo: 'ok' }); }
-      else { await eliminarNotificacion(porEliminarEnvio.id); setHistorial(h => h.filter(x => x.id !== porEliminarEnvio.id)); avisar('Envío eliminado.', { tipo: 'ok' }); }
+      else {
+        await eliminarNotificacion(porEliminarEnvio.id);
+        const id = porEliminarEnvio.id;
+        setPorEliminarEnvio(null); setYendose(id);          // se arruga primero…
+        await new Promise(r => setTimeout(r, 560));          // …y cuando termina, se quita de la lista
+        setHistorial(h => h.filter(x => x.id !== id)); setYendose(null);
+        avisar('Envío eliminado.', { tipo: 'ok' });
+        return;
+      }
       setPorEliminarEnvio(null);
     } catch (err) { avisar(traducirError(err), { tipo: 'error' }); }
     finally { setEliminandoEnvio(false); }
@@ -485,7 +494,7 @@ function PestanaNotificaciones() {
             <thead><tr><th>Fecha</th><th>Proceso</th><th>Tipo</th><th>Resultado</th><th><span className="sr-only">Eliminar</span></th></tr></thead>
             <tbody>
               {historial.map(h => (
-                <tr key={h.id}>
+                <tr key={h.id} className={yendose === h.id ? 'se-va' : undefined}>
                   <td>{new Date(h.enviado_en).toLocaleString('es-CO')}</td>
                   <td>{h.indicadores_procesos?.nombre || 'Todos'}</td>
                   <td>{h.modo}</td>

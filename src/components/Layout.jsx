@@ -8,6 +8,9 @@ import FranjaPlazo from './FranjaPlazo';
 import CambiarClave from './CambiarClave';
 import CambiarNombre from './CambiarNombre';
 import Paleta from './Paleta';
+import Atajos from './Atajos';
+import SelectorIdioma from './SelectorIdioma';
+import { t as tr, getIdioma, IDIOMAS } from '../lib/idioma';
 import { registrarIngresoUnaVez, latido } from '../lib/accesos';
 import { useMovil } from '../lib/movil';
 import { MovilBarra, MovilTabs, HojaMas, HojaCuenta } from './movil/Piezas';
@@ -87,7 +90,7 @@ function MenuProximamente({ items, navegar }) {
   return (
     <div className="mast-proximamente">
       <button type="button" className="mast-proximamente-btn" ref={btn} aria-expanded={abierto} aria-haspopup="dialog" onClick={() => setAbierto(a => !a)}>
-        <i className="fa-solid fa-hourglass-half" aria-hidden="true"></i><span>Próximamente</span><i className={`fa-solid ${abierto ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i>
+        <i className="fa-solid fa-hourglass-half" aria-hidden="true"></i><span>{tr('Próximamente')}</span><i className={`fa-solid ${abierto ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i>
       </button>
       {abierto && (
         <CartaDesplegable ancla={btn.current} titulo="Próximamente" ancho={300} onCerrar={() => setAbierto(false)}>
@@ -109,7 +112,7 @@ function MenuProximamente({ items, navegar }) {
 }
 
 /** Menú de la persona: su correo y rol, y las dos cosas que puede hacer con su cuenta. */
-function MenuUsuario({ sesion, onClave, onNombre }) {
+function MenuUsuario({ sesion, onClave, onNombre, onIdioma }) {
   const btnU = useRef(null);
   const [prefs, setPrefs] = useState(false);
   const [abierto, setAbierto] = useState(false);
@@ -144,6 +147,7 @@ function MenuUsuario({ sesion, onClave, onNombre }) {
                 <li><button type="button" onClick={() => { setAbierto(false); onNombre(); }}><span className="hoja-ico"><i className="fa-solid fa-id-badge" aria-hidden="true"></i></span><span><strong>Cambiar mi nombre</strong><small>Cómo quieres que te llamen</small></span></button></li>
                 <li><button type="button" onClick={() => { setAbierto(false); onClave(); }}><span className="hoja-ico"><i className="fa-solid fa-key" aria-hidden="true"></i></span><span><strong>Cambiar mi contraseña</strong><small>Mínimo 8 caracteres</small></span></button></li>
                 <li><button type="button" onClick={() => { setAbierto(false); setPrefs(true); }}><span className="hoja-ico"><i className="fa-solid fa-sliders" aria-hidden="true"></i></span><span><strong>Preferencias</strong><small>Modo oscuro, tamaño de letra y movimiento</small></span></button></li>
+                <li><button type="button" onClick={() => { setAbierto(false); onIdioma(); }}><span className="hoja-ico"><i className="fa-solid fa-language" aria-hidden="true"></i></span><span><strong>{tr('Idioma')}</strong><small>{IDIOMAS.find(i => i.codigo === getIdioma())?.nativo}</small></span></button></li>
               </ul>
             ),
             pie: <div className="ac-pie"><button type="button" className="btn-secondary btn-chico" onClick={cerrar}>Cerrar</button><button type="button" className="btn-danger btn-chico" onClick={cerrarSesion}><i className="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Cerrar sesión</button></div>,
@@ -155,6 +159,8 @@ function MenuUsuario({ sesion, onClave, onNombre }) {
 }
 
 const TITULOS = [['/inicio', 'Inicio'], ['/dashboard', 'Dashboard'], ['/matriz', 'Matriz de indicadores'], ['/indicadores/', 'Ficha del indicador'], ['/indicadores', 'Indicadores'], ['/informe', 'Informe mensual'], ['/importar', 'Importar desde Excel'], ['/novedades', 'Novedades'], ['/configuracion', 'Configuración'], ['/bitacora', 'Bitácora'], ['/capacitaciones', 'Capacitaciones'], ['/auditoria-control', 'Auditoría y control'], ['/ayuda', 'Cómo se usa']];
+// los títulos de pantalla también se traducen
+const tituloDe = ruta => { const par = TITULOS.find(([k]) => ruta.startsWith(k)); return par ? tr(par[1]) : null; };
 
 export default function Layout() {
   const { sesion } = useSesion();
@@ -167,6 +173,9 @@ export default function Layout() {
   const [cambiandoClave, setCambiandoClave] = useState(false);
   const [cambiandoNombre, setCambiandoNombre] = useState(false);
   const [paleta, setPaleta] = useState(false);
+  const [atajos, setAtajos] = useState(false);
+  const [idioma, setIdiomaAbierto] = useState(false);
+  const [, setRefrescoIdioma] = useState(0);
   const navRef = useRef(null);
   const [marcador, setMarcador] = useState(null);
   const [progreso, setProgreso] = useState(0);
@@ -220,12 +229,20 @@ export default function Layout() {
     return () => { clearTimeout(a); clearTimeout(b); };
   }, [pathname]);
 
+  // al cambiar el idioma hay que volver a pintar: los textos salen de t()
+  useEffect(() => {
+    const cambio = () => setRefrescoIdioma(n => n + 1);
+    window.addEventListener('tm:idioma', cambio);
+    return () => window.removeEventListener('tm:idioma', cambio);
+  }, []);
+
   // Ctrl/⌘ + K, o "/" fuera de un campo, abre el buscador
   useEffect(() => {
     const tecla = e => {
       const escribiendo = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
       if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); setPaleta(p => !p); }
       else if (e.key === '/' && !escribiendo && !e.ctrlKey && !e.metaKey) { e.preventDefault(); setPaleta(true); }
+      else if (e.key === '?' && !escribiendo && !e.ctrlKey && !e.metaKey) { e.preventDefault(); setAtajos(a => !a); }
     };
     window.addEventListener('keydown', tecla);
     return () => window.removeEventListener('keydown', tecla);
@@ -258,6 +275,8 @@ export default function Layout() {
         {cambiandoClave && <CambiarClave onCerrar={() => setCambiandoClave(false)} />}
         {cambiandoNombre && <CambiarNombre actual={sesion?.nombre} email={sesion?.email} onCerrar={() => setCambiandoNombre(false)} />}
         {paleta && <Paleta sesion={sesion} grupos={grupos} onCerrar={() => setPaleta(false)} onClave={() => setCambiandoClave(true)} onNombre={() => setCambiandoNombre(true)} />}
+        {atajos && <Atajos onCerrar={() => setAtajos(false)} />}
+        {idioma && <SelectorIdioma onCerrar={() => setIdiomaAbierto(false)} />}
         <InstalarSheet conSesion={!!sesion?.id} movil />
       </div>
     );
@@ -273,7 +292,7 @@ export default function Layout() {
             <span className="mast-marcador" aria-hidden="true" style={marcador ? { transform: `translateX(${marcador.x}px)`, width: marcador.w, opacity: 1 } : { opacity: 0 }} />
             {grupos.filter(g => g.titulo !== 'Próximamente').map((g, gi) => (
               <div className="mast-grupo" key={g.titulo} role="group" aria-label={g.titulo} style={{ '--g': gi }}>
-                {g.items.map(i => <NavLink key={i.to} to={i.to} end={i.exacto} className={clase}><i className={`fa-solid ${i.icono}`} aria-hidden="true"></i><span className="t-largo">{i.texto}</span>{i.corto && <span className="t-corto" aria-hidden="true">{i.corto}</span>}</NavLink>)}
+                {g.items.map(i => <NavLink key={i.to} to={i.to} end={i.exacto} className={clase}><i className={`fa-solid ${i.icono}`} aria-hidden="true"></i><span className="t-largo">{tr(i.texto)}</span>{i.corto && <span className="t-corto" aria-hidden="true">{tr(i.corto)}</span>}</NavLink>)}
               </div>
             ))}
           </nav>
@@ -283,7 +302,7 @@ export default function Layout() {
           </button>
           <Campana sesion={sesion} />
           <button type="button" className="mast-crear" ref={fabRef} onClick={abrirCrear} aria-label="¿Qué quieres hacer hoy?" aria-haspopup="dialog"><span className="mast-crear-ico"><i className="fa-solid fa-plus" aria-hidden="true"></i></span><span className="mast-crear-txt" aria-hidden="true">Acciones</span></button>
-          <MenuUsuario sesion={sesion} onClave={() => setCambiandoClave(true)} onNombre={() => setCambiandoNombre(true)} />
+          <MenuUsuario sesion={sesion} onClave={() => setCambiandoClave(true)} onNombre={() => setCambiandoNombre(true)} onIdioma={() => setIdiomaAbierto(true)} />
         </div>
       </header>
       <div className={`ruta-progreso p${progreso}`} aria-hidden="true"><i /></div>

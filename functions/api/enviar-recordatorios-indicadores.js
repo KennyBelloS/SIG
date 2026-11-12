@@ -454,7 +454,17 @@ export async function onRequestGet({ request, env }) {
     const yaEnviado = fecha => String(fecha || '').slice(0, 7) === esteMes;
 
     // Latido: queda anotado que el despertador llamó, así el administrador ve que funciona.
-    try { await db.patch('indicadores_configuracion?id=eq.1', { ultimo_pulso: new Date().toISOString() }); } catch { /* si la columna aún no existe, no pasa nada */ }
+    // NO se calla el error: si esto falla, la pantalla «Envío automático» diría para siempre que el
+    // despertador nunca llamó, aunque el flujo de GitHub salga en verde. Queda dicho en la respuesta.
+    try {
+      await db.patch('indicadores_configuracion?id=eq.1', { ultimo_pulso: new Date().toISOString() });
+      salida.latido = 'anotado';
+    } catch (err) {
+      const txt = String(err?.message || err);
+      salida.latido = /ultimo_pulso|column/i.test(txt)
+        ? 'ERROR: falta la columna «ultimo_pulso» en la base de datos. Ejecuta supabase/migracion_roles_y_metas.sql en Supabase → SQL Editor.'
+        : `ERROR al anotar el latido: ${txt}`;
+    }
 
     // Recordatorio del mes en curso (día 2 por defecto) a TODOS los procesos, con pendientes o sin ellos.
     // Si el despertador falló ese día, se recupera en los días siguientes, una sola vez al mes.
