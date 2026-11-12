@@ -1,6 +1,8 @@
 # La aplicación consulta /version.json para saber si hay una versión nueva: nunca debe quedar guardado.
 /version.json
   Cache-Control: no-store
+/sw.js
+  Cache-Control: no-cache
 # El documento principal siempre se revalida; los archivos con nombre único (/assets) se guardan para siempre.
 /
   Cache-Control: no-cache

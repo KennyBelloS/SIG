@@ -12,10 +12,13 @@ import Matriz from './pages/Matriz';
 import Informe from './pages/Informe';
 import Importar from './pages/Importar';
 import Ayuda from './pages/Ayuda';
+import Capacitaciones from './pages/Capacitaciones';
+import AuditoriaControl from './pages/AuditoriaControl';
 import InicioMovil from './pages/InicioMovil';
 import { useMovil } from './lib/movil';
 import { useSesion } from './lib/useSesion';
 import Actualizador from './components/Actualizador';
+import EstadoOffline from './components/EstadoOffline';
 import EntradaAnimada from './components/EntradaAnimada';
 
 function SoloAdmin({ sesion, children }) {
@@ -47,11 +50,11 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Inicio sesion={sesion} />} />
         <Route path="/inicio" element={<InicioMovil />} />
-        <Route path="/indicadores" element={<Indicadores />} />
-        <Route path="/indicadores/:id" element={<IndicadorDetalle />} />
-        <Route path="/matriz" element={<Matriz />} />
+        <Route path="/indicadores" element={sesion?.rol === 'usuario' ? <Navigate to="/capacitaciones" replace /> : <Indicadores />} />
+        <Route path="/indicadores/:id" element={sesion?.rol === 'usuario' ? <Navigate to="/capacitaciones" replace /> : <IndicadorDetalle />} />
+        <Route path="/matriz" element={sesion?.rol === 'usuario' ? <Navigate to="/capacitaciones" replace /> : <Matriz />} />
         <Route path="/ayuda" element={<Ayuda />} />
-        <Route path="/informe" element={<Informe />} />
+        <Route path="/informe" element={sesion?.rol === 'usuario' ? <Navigate to="/capacitaciones" replace /> : <Informe />} />
         <Route path="/importar" element={<SoloRegistro sesion={sesion}><Importar /></SoloRegistro>} />
         <Route path="/dashboard" element={<SoloAdmin sesion={sesion}><Dashboard /></SoloAdmin>} />
         <Route path="/resumen" element={<Navigate to="/dashboard" replace />} />
@@ -59,10 +62,13 @@ export default function App() {
         <Route path="/configuracion" element={<SoloAdmin sesion={sesion}><Configuracion /></SoloAdmin>} />
         <Route path="/bitacora" element={<SoloAdmin sesion={sesion}><Auditoria /></SoloAdmin>} />
         <Route path="/auditoria" element={<Navigate to="/bitacora" replace />} />
+        <Route path="/capacitaciones" element={(sesion?.puedeRegistrar || sesion?.rol === 'usuario') ? <Capacitaciones /> : <Navigate to="/" replace />} />
+        <Route path="/auditoria-control" element={<SoloRegistro sesion={sesion}><AuditoriaControl /></SoloRegistro>} />
       </Route>
     </Routes>
     <EntradaAnimada nombre={sesion.nombre} />
     <Actualizador conSesion />
+    <EstadoOffline />
     </>
   );
 }

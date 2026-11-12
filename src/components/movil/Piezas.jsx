@@ -161,7 +161,7 @@ export function HojaMas({ grupos, cuarto, onCerrar, navegar, sesion, onHoja, onN
                   <li key={i.to}>
                     <button type="button" className={`mas-mod${enBarra.has(i.to) ? ' fija' : ''}`} onClick={() => { onCerrar(); navegar(i.to); }}>
                       <span className="mas-mod-ico"><i className={`fa-solid ${i.icono}`} aria-hidden="true"></i></span>
-                      <strong>{i.texto}</strong>
+                      <strong>{i.texto}{i.proximamente && <span className="chip-proximamente">Pronto</span>}</strong>
                       <small>{detalle[i.to] || (enBarra.has(i.to) ? 'En la barra de abajo' : '')}</small>
                       {insignia[i.to] > 0 && <b className="hoja-insignia" aria-label={`${insignia[i.to]} por atender`}>{insignia[i.to]}</b>}
                       {enBarra.has(i.to) && <i className="fa-solid fa-thumbtack mas-mod-pin" aria-hidden="true"></i>}

@@ -121,7 +121,8 @@ export default function IndicadorDetalle() {
     if (!String(form.accion || '').trim()) { setErrorForm('El plan de acción es obligatorio, incluso cuando el indicador cumple.'); return; }
     setGuardando(true); setError(null);
     try {
-      await guardarRegistro({
+      const reg = porMes.get(mesAbierto);
+      const resultado = await guardarRegistro({
         indicador_id: Number(id), anio, mes: mesAbierto,
         valor: valorDelFormulario(),
         componentes: porComp && algunNumero && calc != null ? { a: Number(form.a), b: Number(form.b) } : apoyoOpc ? { a: form.a === '' ? null : Number(form.a), b: form.b === '' ? null : Number(form.b) } : null,
@@ -129,13 +130,15 @@ export default function IndicadorDetalle() {
         responsable_accion: form.responsable_accion, fecha_compromiso: form.fecha_compromiso || null,
         plan_sugerido: false,
         registrado_por: sesion?.email,
+        vistoEn: reg?.actualizado_en ?? null,
       });
       const cumple = cumpleMeta(indicador, valorDelFormulario(), mesAbierto);
       const nombreMes = MESES[mesAbierto - 1];
       setExito(true); await new Promise(res => setTimeout(res, menosMovimiento() ? 120 : 700));   // el botón se tiñe de verde y dibuja un visto antes de cerrar
       setMesAbierto(null);
       await cargar();
-      if (cumple === true) avisar(`${nombreMes} guardado: ¡cumple la meta!`, { tipo: 'ok', celebrar: true });
+      if (resultado?.pendiente) avisar(`${nombreMes}: guardado en este equipo. Se enviará solo en cuanto vuelva internet.`, { tipo: 'alerta' });
+      else if (cumple === true) avisar(`${nombreMes} guardado: ¡cumple la meta!`, { tipo: 'ok', celebrar: true });
       else if (cumple === false) avisar(`${nombreMes} guardado: no alcanzó la meta. Quedó su plan de acción.`, { tipo: 'alerta' });
       else avisar(`${nombreMes} guardado.`, { tipo: 'ok' });
     } catch (err) { setErrorForm(traducirError(err)); } finally { setGuardando(false); setExito(false); }

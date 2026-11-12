@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { traducirError } from '../lib/indicadores';
 import Escribiendo from '../components/vida/Escribiendo';
 import PrevisualizacionApp from '../components/vida/PrevisualizacionApp';
-import { useMovil } from '../lib/movil';
+import { useMovil, esAndroid } from '../lib/movil';
 import { menosMovimiento } from '../lib/preferencias';
 import { iniciarSesion } from '../lib/useSesion';
 import { resolverAcceso } from '../lib/acceso';
@@ -133,7 +133,7 @@ export default function Login() {
           <img src="/logo.png" alt="Falcon Farms, Finca Torremolinos" className="ent2-logo" />
           <h1><span style={{ '--w': 0 }}>Sistema</span> <span style={{ '--w': 1 }}>de</span> <span style={{ '--w': 2 }}>Gestión</span></h1>
           <p className="ent2-lema">Cada proceso, cada meta, cada mes, en un solo lugar.</p>
-          <div className="ent2-prev"><PrevisualizacionApp tipo={estrecha ? 'iphone' : 'macbook'} /></div>
+          <div className="ent2-prev"><PrevisualizacionApp tipo={estrecha ? (esAndroid() ? 'android' : 'iphone') : 'macbook'} /></div>
           <span className="ent2-pie">Falcon Farms · Suesca, Cundinamarca</span>
         </section>
 

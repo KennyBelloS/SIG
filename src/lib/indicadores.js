@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { encolarRegistro, fusionarConCola, hayConexionReal } from './offline';
 
 export const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 export const MESES_CORTO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -115,7 +116,7 @@ export async function getRegistros(indicadorId, anio) {
     .from('indicadores_registros').select('*')
     .eq('indicador_id', indicadorId).eq('anio', anio).order('mes');
   if (error) throw error;
-  return data || [];
+  return fusionarConCola(data || []);
 }
 
 export async function getRegistrosDelMes({ procesoId = null, anio, mes }) {
@@ -129,10 +130,14 @@ export async function getRegistrosDelMes({ procesoId = null, anio, mes }) {
     .from('indicadores_registros').select('*')
     .in('indicador_id', ids).eq('anio', anio).eq('mes', mes);
   if (error) throw error;
-  return data || [];
+  return fusionarConCola(data || []);
 }
 
-export async function guardarRegistro({ indicador_id, anio, mes, valor, analisis, causa, accion, plan_sugerido, responsable_accion, fecha_compromiso, registrado_por, componentes }) {
+/** `vistoEn`: el «actualizado_en» que la persona tenía en pantalla al abrir el formulario (sirve, si se
+ *  guarda sin internet, para saber luego si alguien más cambió el dato mientras tanto). Devuelve
+ *  `{ pendiente: true }` cuando quedó encolado para enviarse después (sin internet en ese momento),
+ *  o `undefined` cuando ya se guardó en el servidor. */
+export async function guardarRegistro({ indicador_id, anio, mes, valor, analisis, causa, accion, plan_sugerido, responsable_accion, fecha_compromiso, registrado_por, componentes, vistoEn }) {
   const hayValor = valor !== '' && valor !== undefined && valor !== null;
   // Regla de negocio: todo dato registrado lleva su plan de acción.
   if (hayValor && !String(accion || '').trim()) throw new Error('El plan de acción es obligatorio para registrar un dato.');
@@ -151,8 +156,15 @@ export async function guardarRegistro({ indicador_id, anio, mes, valor, analisis
     registrado_en: new Date().toISOString(),
     actualizado_en: new Date().toISOString(),
   };
-  const { error } = await supabase.from('indicadores_registros').upsert(payload, { onConflict: 'indicador_id,anio,mes' });
-  if (error) throw error;
+  if (!(await hayConexionReal())) { encolarRegistro(payload, vistoEn); return { pendiente: true }; }
+  try {
+    const { error } = await supabase.from('indicadores_registros').upsert(payload, { onConflict: 'indicador_id,anio,mes' });
+    if (error) throw error;
+  } catch (err) {
+    // sin internet de verdad (el navegador decía que sí la había): se guarda igual, en este equipo
+    if (err instanceof TypeError || /failed to fetch|network/i.test(err?.message || '')) { encolarRegistro(payload, vistoEn); return { pendiente: true }; }
+    throw err;
+  }
 }
 
 // --- Evaluación de cumplimiento --------------------------------------------------
@@ -305,7 +317,7 @@ export async function getRegistrosMultiAnio(indicadorId, anios) {
     .from('indicadores_registros').select('*')
     .eq('indicador_id', indicadorId).in('anio', anios).order('mes');
   if (error) throw error;
-  return data || [];
+  return fusionarConCola(data || []);
 }
 
 /** % de incumplimiento de un indicador: de los meses con dato en ese año, cuántos no llegaron a la meta. */

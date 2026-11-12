@@ -672,17 +672,66 @@ td.celda-principal small{ display:block; }
 /* =====================================================================
    ENTRADA ANIMADA, ACTUALIZACIÓN AUTOMÁTICA Y LLEGADA DE LA APLICACIÓN
    ===================================================================== */
-.entrada-anim{ position:fixed; inset:0; z-index:500; background:linear-gradient(160deg,#0F3D22,#0B2E1A 75%); color:#fff; display:grid; place-items:center; cursor:pointer; clip-path:circle(150% at 50% 55%); }
+.entrada-anim{ position:fixed; inset:0; z-index:500; background:linear-gradient(160deg,#0F3D22,#0B2E1A 75%); color:#fff; display:grid; place-items:center; cursor:pointer; clip-path:circle(150% at 50% 55%); overflow:hidden; }
 .entrada-anim.abre{ animation:cortina-abre .9s cubic-bezier(.7,0,.2,1) forwards; pointer-events:none; }
+.entrada-anim::before{ content:''; position:absolute; inset:-25%; z-index:0; pointer-events:none;
+  background:radial-gradient(40% 46% at 50% 28%,rgba(240,194,90,.3),transparent 70%), radial-gradient(45% 45% at 14% 88%,rgba(63,174,98,.45),transparent 70%), radial-gradient(40% 40% at 90% 92%,rgba(201,147,43,.3),transparent 70%);
+  animation:aurora 16s ease-in-out infinite alternate; }
 @keyframes cortina-abre{ to{ clip-path:circle(0% at 50% 55%); } }
 .entrada-anim-centro{ position:relative; z-index:2; text-align:center; padding:0 20px; margin-top:-8vh; }
 .entrada-anim-logo{ width:clamp(84px,14vh,124px); height:clamp(84px,14vh,124px); border-radius:20px; background:#fff; object-fit:cover; animation:logo-entra .8s var(--curva-resorte) both; box-shadow:0 18px 50px -12px rgba(0,0,0,.55); }
 .entrada-anim-hola{ margin-top:clamp(14px,3vh,26px); font-size:clamp(15px,2.2vh,19px); font-weight:700; color:var(--gold); animation:revela .7s var(--curva) .35s both; }
 .entrada-anim-titulo{ font:800 clamp(52px,9vh,96px)/.9 var(--display); letter-spacing:.005em; margin-top:6px; animation:palabra-sube .9s var(--curva) .5s both; }
-.entrada-anim-sub{ margin-top:14px; font-size:calc(14px * var(--esc,1)); color:rgba(255,255,255,.8); animation:revela .7s var(--curva) .9s both; }
-.entrada-anim-campo{ position:absolute; left:0; right:0; bottom:0; width:100%; height:46%; min-height:200px; z-index:1; pointer-events:none; }
-.entrada-anim .rosal-tallo{ animation-duration:.9s; animation-delay:calc(.2s + var(--i) * .07s); }
-.entrada-anim .rosal-flor{ animation-delay:calc(.75s + var(--i) * .07s), calc(1.6s + var(--i) * .2s); }
+.entrada-anim-sub{ margin-top:18px; font-size:calc(14px * var(--esc,1)); font-style:italic; font-family:var(--serif); color:rgba(255,255,255,.65); animation:revela .7s var(--curva) 2s both; }
+/* papel cuadriculado tenue: liga esta pantalla con el resto del «plano de campo», en vez de una escena decorativa aparte */
+.ea-papel{ position:absolute; inset:0; z-index:0; pointer-events:none; opacity:.5;
+  background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px), linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+  background-size:38px 38px; }
+/* el barrido que «enciende» la pantalla al entrar, como un instrumento arrancando */
+.ea-escaneo{ position:absolute; left:0; right:0; top:-4%; height:2px; z-index:1; pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(240,194,90,.9),transparent);
+  box-shadow:0 0 22px 5px rgba(240,194,90,.55);
+  animation:escaneo-baja 1.3s cubic-bezier(.4,0,.2,1) .15s both; }
+@keyframes escaneo-baja{ to{ top:104%; } }
+.entrada-anim-titulo{ position:relative; overflow:hidden; }
+.entrada-anim-titulo::after{ content:''; position:absolute; inset:0; background:linear-gradient(100deg,transparent 40%,rgba(255,255,255,.55) 50%,transparent 60%); transform:translateX(-120%); animation:titulo-brillo 1.1s ease .95s both; }
+@keyframes titulo-brillo{ to{ transform:translateX(120%); } }
+/* retícula de agrimensor alrededor del logo: una cruz fina que se asoma, no un marco decorativo */
+.ea-encabezado{ position:absolute; top:0; left:0; right:0; z-index:2; display:flex; justify-content:space-between; padding:clamp(16px,3vh,28px) clamp(18px,3vw,40px); font:700 calc(11px * var(--esc,1)) var(--texto); letter-spacing:.14em; color:rgba(255,255,255,.4); animation:revela .6s var(--curva) .35s both; }
+.ea-dato{ position:absolute; z-index:2; text-align:center; animation:revela .6s var(--curva) 2.6s both; }
+.ea-dato b{ display:block; font:600 clamp(28px,4.5vh,44px) var(--serif); color:#fff; } .ea-dato b i{ font-style:normal; font-size:.6em; color:var(--gold); }
+.ea-dato small{ display:block; margin-top:2px; font-size:calc(11px * var(--esc,1)); color:rgba(255,255,255,.45); max-width:16ch; }
+.ea-dato-izq{ left:clamp(18px,4vw,64px); bottom:clamp(60px,12vh,120px); }
+.ea-dato-der{ right:clamp(18px,4vw,64px); top:clamp(70px,16vh,160px); }
+.ea-dato-izq2{ left:clamp(18px,4vw,64px); top:clamp(70px,16vh,160px); animation-delay:2.1s; }
+.ea-dato-der2{ right:clamp(18px,4vw,64px); bottom:clamp(60px,12vh,120px); animation-delay:2.4s; }
+/* regla de agrimensor en cada borde: pura ambientación técnica */
+.ea-regla{ position:absolute; top:12%; bottom:12%; width:1px; z-index:1; pointer-events:none;
+  background-image:repeating-linear-gradient(0deg, rgba(240,194,90,.4) 0 1px, transparent 1px 30px); }
+.ea-regla-izq{ left:clamp(6px,2vw,26px); } .ea-regla-der{ right:clamp(6px,2vw,26px); }
+/* coordenadas junto al anillo: el mismo gesto de panel de instrumentos que ya tiene el resto de la pantalla */
+.ea-coord{ position:absolute; font:700 9.5px var(--texto); letter-spacing:.06em; color:rgba(240,194,90,.6); white-space:nowrap; animation:revela .5s var(--curva) both; }
+.ea-coord-1{ left:-86px; top:18px; animation-delay:.7s; } .ea-coord-2{ right:-90px; bottom:22px; animation-delay:.85s; }
+@media (max-width:900px){ .ea-regla, .ea-coord, .ea-dato-izq2, .ea-dato-der2{ display:none; } }
+.ea-proximo{ position:absolute; left:0; right:0; bottom:clamp(54px,9vh,76px); z-index:2; text-align:center; font:700 calc(11.5px * var(--esc,1)) var(--texto); letter-spacing:.03em; color:var(--gold); animation:revela .6s var(--curva) 2.9s both; }
+.ea-proximo-ico{ display:inline-block; width:6px; height:6px; margin-right:7px; border-radius:50%; background:var(--gold); box-shadow:0 0 6px 1px rgba(240,194,90,.7); vertical-align:middle; }
+.ea-pie-tecnico{ position:absolute; bottom:0; left:0; right:0; z-index:2; display:flex; align-items:center; justify-content:center; gap:7px; padding:clamp(14px,2.6vh,22px) 14px; font:700 calc(9.5px * var(--esc,1)) var(--texto); letter-spacing:.1em; color:rgba(255,255,255,.4); flex-wrap:wrap; animation:revela .6s var(--curva) 3.1s both; }
+.ea-pie-tecnico i{ width:9px; height:9px; border-radius:50%; border:1px solid rgba(255,255,255,.3); }
+@media (max-width:760px){ .ea-dato{ display:none; } .ea-encabezado span:last-child{ display:none; } }
+.ea-retic{ position:absolute; inset:-20px; pointer-events:none; animation:revela .5s var(--curva) .1s both; }
+.ea-retic i{ position:absolute; background:rgba(240,194,90,.4); } .ea-retic i:first-child{ left:50%; top:0; bottom:0; width:1px; } .ea-retic i:last-child{ top:50%; left:0; right:0; height:1px; }
+/* el año, mes a mes: lo que la aplicación de verdad hace, en vez de una lista de pasos */
+.ea-anio{ list-style:none; display:flex; gap:7px; margin:22px 0 0; padding:0; }
+.ea-anio li{ position:relative; width:clamp(26px,3.6vh,38px); height:clamp(26px,3.6vh,38px); border-radius:9px; display:grid; place-items:center; font:700 calc(11px * var(--esc,1)) var(--texto); color:rgba(255,255,255,.55); border:1.5px solid rgba(255,255,255,.16); opacity:0; transform:scale(.4); animation:mes-enciende .5s cubic-bezier(.2,1.4,.4,1) both; animation-delay:calc(.5s + var(--i) * .14s); }
+.ea-anio li.ea-hecho{ color:#fff; border-color:transparent; }
+.ea-anio li.ea-futuro{ background:transparent !important; }
+.ea-anio li[data-hoy]{ box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 0 16px 3px rgba(240,194,90,.6); animation:mes-enciende .5s cubic-bezier(.2,1.4,.4,1) both, mes-hoy-late 1.6s ease-in-out 2.3s infinite; }
+.ea-anio li[data-hoy]::after{ content:''; position:absolute; inset:-5px; border-radius:12px; border:2px solid var(--gold); opacity:0; animation:hoy-pulso 1s ease-out 2.3s; }
+@keyframes mes-enciende{ to{ opacity:1; transform:scale(1); } }
+@keyframes mes-hoy-late{ 0%,100%{ box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 0 16px 3px rgba(240,194,90,.6); } 50%{ box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 0 22px 6px rgba(240,194,90,.9); } }
+@keyframes hoy-pulso{ 0%{ opacity:.9; transform:scale(1); } 100%{ opacity:0; transform:scale(1.9); } }
+@media (max-width:540px){ .ea-anio{ gap:5px; } }
+@media (prefers-reduced-motion:reduce){ .entrada-anim-titulo::after, .ea-anio li, .ea-retic{ animation:none; opacity:1; transform:none; } }
 
 /* la barra y la franja llegan con la aplicación */
 .mast{ animation:mast-baja .8s var(--curva) both; }
@@ -748,5 +797,4 @@ td.celda-principal small{ display:block; }
 .tabla-excel-edit{ min-width:820px; } .tabla-excel-edit td{ padding:4px 3px; min-width:62px; } .tabla-excel-edit input{ width:100%; min-height:36px; padding:4px 6px; text-align:center; border-width:1.5px; font-variant-numeric:tabular-nums; }
 @media (max-width:900px){ .editor-cuerpo{ grid-template-columns:1fr; } .editor-der{ position:static; order:-1; } .editor-izq .config-grid-form{ grid-template-columns:1fr; } .editor-hoja{ max-height:none; } }
 @media (prefers-reduced-motion:reduce){ .gm-barra, .gm-meta, .editor-izq{ animation:none; } }
-.entrada-anim-campo{ height:36%; }
 .entrada-anim-centro{ margin-top:-16vh; }

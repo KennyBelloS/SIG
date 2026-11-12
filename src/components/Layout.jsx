@@ -22,28 +22,53 @@ import { menosMovimiento } from '../lib/preferencias';
 
 /* Orden de los módulos: Dashboard, Matriz, Indicadores, Informe mensual; luego los de datos y administración,
    y "Cómo se usa" siempre al final. */
-const GRUPOS = (sesion) => [
-  {
-    titulo: 'Seguimiento',
-    items: [
-      { to: '/inicio', icono: 'fa-house', texto: 'Inicio' },
-      ...(sesion?.esAdmin ? [{ to: '/dashboard', icono: 'fa-chart-pie', texto: 'Dashboard' }] : []),
-      { to: '/matriz', icono: 'fa-table-cells', texto: 'Matriz' },
-      { to: '/indicadores', icono: 'fa-chart-simple', texto: 'Indicadores' },
-      { to: '/informe', icono: 'fa-file-lines', texto: 'Informe mensual', corto: 'Informe' },
-    ],
-  },
-  ...(sesion?.puedeRegistrar ? [{ titulo: 'Datos', items: [{ to: '/importar', icono: 'fa-file-arrow-up', texto: 'Importar Excel', corto: 'Importar' }] }] : []),
-  ...(sesion?.esAdmin ? [{
-    titulo: 'Administración',
-    items: [
-      { to: '/novedades', icono: 'fa-bell', texto: 'Novedades' },
-      { to: '/configuracion', icono: 'fa-sliders', texto: 'Configuración', corto: 'Ajustes' },
-      { to: '/bitacora', icono: 'fa-book-open', texto: 'Bitácora' },
-    ],
-  }] : []),
-  { titulo: 'Ayuda', items: [{ to: '/ayuda', icono: 'fa-circle-question', texto: 'Cómo se usa', corto: 'Ayuda' }] },
-];
+const GRUPOS = (sesion) => {
+  // el rol «usuario» solo ve Capacitaciones: nada de indicadores, matriz, ni el resto.
+  if (sesion?.rol === 'usuario') return [
+    {
+      titulo: 'Seguimiento',
+      items: [
+        { to: '/inicio', icono: 'fa-house', texto: 'Inicio' },
+        { to: '/capacitaciones', icono: 'fa-graduation-cap', texto: 'Capacitaciones' },
+      ],
+    },
+    { titulo: 'Ayuda', items: [{ to: '/ayuda', icono: 'fa-circle-question', texto: 'Cómo se usa', corto: 'Ayuda' }] },
+  ];
+  return [
+    {
+      titulo: 'Seguimiento',
+      items: sesion?.esIngeniero ? [
+        // el ingeniero solo ve Indicadores (Inicio se mantiene: es la pantalla de llegada de todos)
+        { to: '/inicio', icono: 'fa-house', texto: 'Inicio' },
+        { to: '/indicadores', icono: 'fa-chart-simple', texto: 'Indicadores' },
+      ] : [
+        { to: '/inicio', icono: 'fa-house', texto: 'Inicio' },
+        ...(sesion?.esAdmin ? [{ to: '/dashboard', icono: 'fa-chart-pie', texto: 'Dashboard' }] : []),
+        { to: '/matriz', icono: 'fa-table-cells', texto: 'Matriz' },
+        { to: '/indicadores', icono: 'fa-chart-simple', texto: 'Indicadores' },
+        { to: '/informe', icono: 'fa-file-lines', texto: 'Informe mensual', corto: 'Informe' },
+      ],
+    },
+    ...(sesion?.puedeRegistrar ? [{ titulo: 'Datos', items: [{ to: '/importar', icono: 'fa-file-arrow-up', texto: 'Importar Excel', corto: 'Importar' }] }] : []),
+    ...(sesion?.esAdmin ? [{
+      titulo: 'Administración',
+      items: [
+        { to: '/novedades', icono: 'fa-bell', texto: 'Novedades' },
+        { to: '/configuracion', icono: 'fa-sliders', texto: 'Configuración', corto: 'Ajustes' },
+        { to: '/bitacora', icono: 'fa-book-open', texto: 'Bitácora' },
+      ],
+    }] : []),
+    // Todavía sin funcionalidad: solo una vista previa, y solo para quien registra datos (admin y digitador).
+    ...(sesion?.puedeRegistrar ? [{
+      titulo: 'Próximamente',
+      items: [
+        { to: '/capacitaciones', icono: 'fa-graduation-cap', texto: 'Capacitaciones', proximamente: true },
+        { to: '/auditoria-control', icono: 'fa-magnifying-glass-chart', texto: 'Auditoría y control', proximamente: true },
+      ],
+    }] : []),
+    { titulo: 'Ayuda', items: [{ to: '/ayuda', icono: 'fa-circle-question', texto: 'Cómo se usa', corto: 'Ayuda' }] },
+  ];
+};
 
 function Marca() {
   return (
@@ -51,6 +76,35 @@ function Marca() {
       <img src="/logo-icon.png" alt="" width="36" height="36" />
       <span><strong>Torremolinos</strong><small>Sistema de gestión</small></span>
     </span>
+  );
+}
+
+/** Un solo botón agrupa los módulos todavía sin funcionalidad, para no llenar la barra con pestañas reales. */
+function MenuProximamente({ items, navegar }) {
+  const btn = useRef(null);
+  const [abierto, setAbierto] = useState(false);
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="mast-proximamente">
+      <button type="button" className="mast-proximamente-btn" ref={btn} aria-expanded={abierto} aria-haspopup="dialog" onClick={() => setAbierto(a => !a)}>
+        <i className="fa-solid fa-hourglass-half" aria-hidden="true"></i><span>Próximamente</span><i className={`fa-solid ${abierto ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i>
+      </button>
+      {abierto && (
+        <CartaDesplegable ancla={btn.current} titulo="Próximamente" ancho={300} onCerrar={() => setAbierto(false)}>
+          {({ cerrar }) => ({
+            cabecera: <header className="um-cab"><h2><i className="fa-solid fa-hourglass-half" aria-hidden="true"></i> Próximamente</h2></header>,
+            cuerpo: (
+              <ul className="mp-lista">
+                {items.map(i => (
+                  <li key={i.to}><button type="button" onClick={() => { cerrar(); navegar(i.to); }}><i className={`fa-solid ${i.icono}`} aria-hidden="true"></i><span>{i.texto}</span></button></li>
+                ))}
+              </ul>
+            ),
+            pie: <p className="mp-nota">Son solo una vista previa de cómo se van a ver: todavía no hacen nada.</p>,
+          })}
+        </CartaDesplegable>
+      )}
+    </div>
   );
 }
 
@@ -100,7 +154,7 @@ function MenuUsuario({ sesion, onClave, onNombre }) {
   );
 }
 
-const TITULOS = [['/inicio', 'Inicio'], ['/dashboard', 'Dashboard'], ['/matriz', 'Matriz de indicadores'], ['/indicadores/', 'Ficha del indicador'], ['/indicadores', 'Indicadores'], ['/informe', 'Informe mensual'], ['/importar', 'Importar desde Excel'], ['/novedades', 'Novedades'], ['/configuracion', 'Configuración'], ['/bitacora', 'Bitácora'], ['/ayuda', 'Cómo se usa']];
+const TITULOS = [['/inicio', 'Inicio'], ['/dashboard', 'Dashboard'], ['/matriz', 'Matriz de indicadores'], ['/indicadores/', 'Ficha del indicador'], ['/indicadores', 'Indicadores'], ['/informe', 'Informe mensual'], ['/importar', 'Importar desde Excel'], ['/novedades', 'Novedades'], ['/configuracion', 'Configuración'], ['/bitacora', 'Bitácora'], ['/capacitaciones', 'Capacitaciones'], ['/auditoria-control', 'Auditoría y control'], ['/ayuda', 'Cómo se usa']];
 
 export default function Layout() {
   const { sesion } = useSesion();
@@ -217,12 +271,13 @@ export default function Layout() {
           <Marca />
           <nav className="mast-nav" aria-label="Secciones" ref={navRef}>
             <span className="mast-marcador" aria-hidden="true" style={marcador ? { transform: `translateX(${marcador.x}px)`, width: marcador.w, opacity: 1 } : { opacity: 0 }} />
-            {grupos.map((g, gi) => (
+            {grupos.filter(g => g.titulo !== 'Próximamente').map((g, gi) => (
               <div className="mast-grupo" key={g.titulo} role="group" aria-label={g.titulo} style={{ '--g': gi }}>
                 {g.items.map(i => <NavLink key={i.to} to={i.to} end={i.exacto} className={clase}><i className={`fa-solid ${i.icono}`} aria-hidden="true"></i><span className="t-largo">{i.texto}</span>{i.corto && <span className="t-corto" aria-hidden="true">{i.corto}</span>}</NavLink>)}
               </div>
             ))}
           </nav>
+          <MenuProximamente items={grupos.find(g => g.titulo === 'Próximamente')?.items} navegar={navegar} />
           <button type="button" className="mast-buscar" onClick={() => setPaleta(true)} aria-label="Buscar un indicador o una sección (Ctrl K)">
             <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span>Buscar</span><kbd>Ctrl K</kbd>
           </button>

@@ -16,6 +16,12 @@ iniciarPreferencias();
 inicializarTema();
 iniciarVida();
 
+// deja que la aplicación abra y muestre lo último visto sin internet. Solo en producción (compilada):
+// en «npm run dev» no se registra, para no complicar el desarrollo con una caché de por medio.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => { /* si falla, la app sigue funcionando normal, solo sin esta mejora */ }); });
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
