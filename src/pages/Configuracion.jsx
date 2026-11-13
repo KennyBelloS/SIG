@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
@@ -269,6 +269,7 @@ function PestanaNotificaciones() {
   const [porEliminarEnvio, setPorEliminarEnvio] = useState(null);   // null | { id } (uno) | { todo: true }
   const [eliminandoEnvio, setEliminandoEnvio] = useState(false);
   const [yendose, setYendose] = useState(null);   // id de la fila que está haciendo la animación de irse
+  const pendientesBorrado = useRef(new Map());     // id -> { fila, temporizador } — borrados «de mentiras» que todavía se pueden deshacer
 
   async function eliminarEnvios() {
     if (!porEliminarEnvio) return;
@@ -276,18 +277,35 @@ function PestanaNotificaciones() {
     try {
       if (porEliminarEnvio.todo) { await eliminarHistorialNotificaciones(); setHistorial([]); avisar('Se eliminó todo el historial de envíos.', { tipo: 'ok' }); }
       else {
-        await eliminarNotificacion(porEliminarEnvio.id);
         const id = porEliminarEnvio.id;
+        const fila = historial.find(x => x.id === id);
         setPorEliminarEnvio(null); setYendose(id);          // se arruga primero…
-        await new Promise(r => setTimeout(r, 560));          // …y cuando termina, se quita de la lista
+        await new Promise(r => setTimeout(r, 560));          // …y cuando termina, se quita de la vista (pero NO del servidor todavía)
         setHistorial(h => h.filter(x => x.id !== id)); setYendose(null);
-        avisar('Envío eliminado.', { tipo: 'ok' });
+        // el borrado de verdad se demora 5 s: si se deshace a tiempo, nunca llega a pasar
+        const temporizador = setTimeout(async () => {
+          pendientesBorrado.current.delete(id);
+          try { await eliminarNotificacion(id); } catch { /* si falla, se queda en el servidor: inofensivo */ }
+        }, 5000);
+        pendientesBorrado.current.set(id, { fila, temporizador });
+        avisar('Envío eliminado.', { tipo: 'ok', accion: { texto: 'Deshacer', hacer: () => deshacerBorradoEnvio(id) } });
         return;
       }
       setPorEliminarEnvio(null);
     } catch (err) { avisar(traducirError(err), { tipo: 'error' }); }
     finally { setEliminandoEnvio(false); }
   }
+
+  function deshacerBorradoEnvio(id) {
+    const pend = pendientesBorrado.current.get(id);
+    if (!pend) return;                                   // ya pasaron los 5 s: esto ya se envió al servidor
+    clearTimeout(pend.temporizador);
+    pendientesBorrado.current.delete(id);
+    setHistorial(h => [pend.fila, ...h].sort((a, b) => new Date(b.enviado_en) - new Date(a.enviado_en)));
+    avisar('Deshecho: el envío sigue en el historial.', { tipo: 'ok' });
+  }
+
+  useEffect(() => () => { pendientesBorrado.current.forEach(p => clearTimeout(p.temporizador)); }, []);
 
   async function cargar() {
     try {

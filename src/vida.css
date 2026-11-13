@@ -277,7 +277,7 @@ html[data-movimiento="reducido"] *, html[data-movimiento="reducido"] *::before, 
 .mast-crear{ flex:none; display:inline-flex; align-items:center; gap:10px; width:auto; height:44px; padding:0 18px 0 7px; margin:0 4px; border-radius:999px; background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(232,243,236,.9)); color:var(--f-900); font-weight:700; font-size:calc(15.5px * var(--esc,1)); border:1px solid rgba(255,255,255,.75); box-shadow:inset 0 1px 0 #fff, inset 0 -8px 12px -10px rgba(22,101,52,.4), 0 14px 24px -14px rgba(0,0,0,.7); align-self:center; animation:none; transition:transform .3s var(--curva-resorte), box-shadow .3s; }
 .mast-crear:hover{ transform:translateY(-2px); box-shadow:inset 0 1px 0 #fff, 0 18px 28px -14px rgba(0,0,0,.75), 0 0 0 3px rgba(201,147,43,.35); } .mast-crear:active{ transform:scale(.95); }
 .mast-crear-ico{ width:30px; height:30px; flex:none; border-radius:50%; display:grid; place-items:center; background:linear-gradient(180deg,#EDBB4D,#C9932B); color:var(--f-950); font-size:14px; box-shadow:inset 0 1px 0 rgba(255,255,255,.75), 0 4px 8px -4px rgba(126,92,15,.9); } .mast-crear:hover .mast-crear-ico i{ transform:rotate(90deg); } .mast-crear-ico i{ transition:transform .35s var(--curva-resorte); }
-@media (max-width:1560px){ .mast-crear{ padding:0 7px; } .mast-crear-txt{ display:none; } }
+
 
 /* ---- celular: barra superior, búsqueda y hojas de vidrio ---- */
 body.movil .mv-barra{ top:calc(var(--seguro-arriba,0px) + 8px); margin:8px 10px 2px; padding:8px 10px; border-radius:30px; background:var(--vidrio); border:1px solid var(--vidrio-borde); -webkit-backdrop-filter:blur(18px) saturate(1.7); backdrop-filter:blur(18px) saturate(1.7); box-shadow:var(--vidrio-luz); gap:8px; grid-template-columns:auto 1fr auto; }
@@ -551,7 +551,8 @@ body.movil .btn-primary, body.movil .btn-secondary, body.movil .btn-danger{ whit
 @media (prefers-reduced-motion: reduce){ .contenido[data-dir]{ animation:none !important; } }
 html[data-movimiento="reducido"] .contenido[data-dir]{ animation:none !important; }
 /* el texto «Acciones» solo aparece cuando sobra sitio de verdad (no crece con la letra) */
-.mast-crear{ font-size:15.5px; } @media (max-width:1799px){ .mast-crear{ padding:0 7px; } .mast-crear-txt{ display:none; } }
+.mast-crear{ font-size:15.5px; }
+@media (max-width:1799px){ .mast-crear{ width:44px; padding:0; justify-content:center; } .mast-crear-txt{ display:none; } }
 .mast-usuario-datos strong{ font-size:15px; } .mast-usuario-datos small{ font-size:12.5px; }
 
 /* el contador del atajo va después del texto en el código (para el lector de pantalla) y se pinta sobre la esquina del ícono */

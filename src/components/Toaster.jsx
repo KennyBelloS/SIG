@@ -21,6 +21,9 @@ export default function Toaster() {
         <div key={a.id} className={`toast toast-${a.tipo}`} role="status">
           <i className={`fa-solid ${a.tipo === 'ok' ? 'fa-circle-check' : a.tipo === 'alerta' ? 'fa-triangle-exclamation' : 'fa-circle-info'}`} aria-hidden="true" />
           <span>{a.texto}</span>
+          {a.accion && (
+            <button className="btn-texto toast-accion" onClick={() => { a.accion.hacer(); setLista(l => l.filter(x => x.id !== a.id)); }}>{a.accion.texto}</button>
+          )}
           <button className="btn-texto" onClick={() => setLista(l => l.filter(x => x.id !== a.id))} aria-label="Cerrar aviso"><i className="fa-solid fa-xmark" /></button>
           {a.celebrar && (
             <span className="confeti" aria-hidden="true">

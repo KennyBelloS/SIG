@@ -1,6 +1,9 @@
-/* Contenido de la pantalla "Cómo se usa".
-   Todo lo que aquí se afirma describe lo que la aplicación hace de verdad. Si cambias una
-   regla de la aplicación, cambia también aquí el texto que la explica. */
+/* Contenido de "Cómo se usa" y, a través de LAMINAS, también de "Así funciona" (el recorrido animado).
+   Todo lo que aquí se afirma describe lo que la aplicación hace de verdad.
+   REGLA FIJA: toda función nueva que se agregue a la aplicación —por pequeña que sea— se documenta
+   aquí también, en el FAQ o en los «pasos» de la lámina que corresponda, antes de darla por
+   terminada. Nada queda solo en el código: si no está aquí, para la persona que usa la aplicación
+   no existe. Si cambias una regla ya existente, actualiza también el texto que la explica. */
 
 export const ROL = {
   admin: { nombre: 'Administrador', color: '#166534' },
@@ -20,6 +23,7 @@ export const LAMINAS = [
       'Cada indicador tiene su "cinta del año": 12 casillas, una por mes. Verde cumple, vino no cumple, rayado rosa venció sin registrar, gris está por registrar.',
       'Haz clic en una casilla de la cinta y se abre ese mes del indicador, listo para registrar.',
       'Con las flechas del recuadro de la izquierda cambias de mes; con el buscador y los filtros encuentras un indicador o solo los pendientes.',
+      'El botón verde "+" (Acciones) siempre trae de primero "Seguir con…", el último indicador que abriste: es el camino más corto para continuar donde ibas.',
     ] },
   { id: 'registro', icono: 'fa-pen-to-square', titulo: 'Registrar un mes: valor, causa y plan de acción', ruta: '/indicadores', boton: 'Ir a Indicadores',
     resumen: 'Es la tarea más frecuente. Cada dato lleva su plan de acción, incluso cuando el indicador cumple.',
@@ -104,6 +108,7 @@ export const LAMINAS = [
       'Día 16: el mes se cierra y se avisa a todos cómo quedó.',
       'Reciben el correo las personas de "Involucrados" de cada proceso que tengan los avisos activados.',
       'Los correos no tienen botones ni enlaces a propósito: nadie puede suplantarlos con un enlace falso.',
+      'En "Últimos envíos" puedes eliminar uno: aparece "Deshacer" unos segundos antes de que se borre de verdad.',
     ] },
   { id: 'novedades', icono: 'fa-bell', titulo: 'Novedades: lo que necesita tu atención', ruta: '/novedades', boton: 'Ir a Novedades',
     resumen: 'Para el administrador. Ordena los problemas del año por gravedad para que sepas por dónde empezar.',
@@ -368,6 +373,9 @@ export const FAQ = [
   { roles: ['admin'], q: '¿Cómo sé quién cambió un dato o quién entró?', a: 'En la Bitácora. "Actividad" muestra cada cambio con quién lo hizo, cuándo y el valor de antes y de después; "Accesos" muestra quién está en línea ahora y las entradas y salidas. Nadie puede borrar ni alterar ese registro, ni siquiera un administrador.' },
   { roles: ['admin'], q: '¿Cuánto espacio queda en la base de datos?', a: 'En la Bitácora → Espacio: cuánto se usa de los 500 MB del plan gratuito, qué tablas lo ocupan y en cuánto tiempo se llenaría con el ritmo de los últimos 60 días. Si cambias de plan, actualiza el límite ahí mismo.' },
   { roles: ['digitador', 'usuario'], q: '¿Y si pierdo la contraseña?', a: 'Pídele a un administrador que la restablezca.' },
+  { roles: ['admin'], q: '¿Por qué en la Actividad desaparecen solas las notas de "alguien depuró N registros"?', a: 'Esas notas avisan que corrió una limpieza, pero no son auditoría de quién cambió qué: se borran solas después de 1 día para no acumular ruido. El resto de la Actividad (quién cambió un dato, quién entró) no se toca nunca.' },
+  { roles: ['admin', 'digitador', 'usuario'], q: '¿Qué hace la primera tarjeta del botón "+" (Acciones)?', a: 'Te lleva directo al último indicador en el que trabajaste, sin tener que buscarlo. Se recuerda en tu propio equipo; si entras desde otro computador, no aparece hasta que abras algo ahí.' },
+  { roles: ['admin'], q: '¿Puedo deshacer que elimine un envío del historial de correos?', a: 'Sí: al eliminar uno, aparece un aviso con el botón "Deshacer" durante unos segundos. El borrado de verdad se demora ese tiempo a propósito, para que deshacer funcione de verdad y no sea solo una promesa.' },
 ];
 
 /* ---------------------------------------------------------------------------

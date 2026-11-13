@@ -1085,3 +1085,28 @@ table.matriz{ border-collapse:separate; border-spacing:0; font-size:calc(13px * 
 .mp-lista i{ width:18px; text-align:center; color:var(--ink-3); }
 .mp-nota{ font-size:calc(11.5px * var(--esc,1)); color:var(--ink-3); padding:2px 2px 0; }
 .chip-proximamente{ display:inline-flex; align-items:center; gap:4px; margin-left:6px; padding:1px 7px; border-radius:999px; background:var(--gold-bg); color:var(--gold-ink); font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; vertical-align:middle; }
+
+/* botón de acción dentro de un aviso (ej. «Deshacer») */
+.toast .toast-accion{ flex:none; color:var(--gold); font-weight:800; text-decoration:underline; text-underline-offset:2px; padding:4px 2px; }
+.toast .toast-accion:hover{ color:#fff; }
+
+/* ---------- variante «cajón»: panel lateral en vez de tarjeta centrada ---------- */
+.cajon-fondo{ place-items:stretch; justify-items:end; background:rgba(11,46,26,.32); padding:0; }
+.ind-modal.cajon{ position:relative; max-width:min(440px,100%); width:440px; height:100%; max-height:100%; margin:0; border-radius:0; box-shadow:-30px 0 60px -24px rgba(7,30,15,.5); animation:cajon-entra .26s cubic-bezier(.2,.9,.25,1) both; padding-top:calc(var(--s-5) + 40px); }
+@keyframes cajon-entra{ from{ transform:translateX(100%); } }
+/* las flechas para moverse de un mes a otro sin cerrar: arriba a la derecha, discretas */
+.cajon-nav{ position:absolute; top:var(--s-4); right:var(--s-5); display:flex; gap:2px; background:var(--sunk); border:1px solid var(--line); border-radius:999px; padding:2px; z-index:2; }
+.cajon-nav button{ width:28px; height:28px; display:grid; place-items:center; border-radius:999px; color:var(--ink-2); } .cajon-nav button:hover{ background:var(--f-100); color:var(--f-900); }
+@media (max-width:640px){ .ind-modal.cajon{ width:100%; max-width:100%; } }
+@media (prefers-reduced-motion:reduce){ .ind-modal.cajon{ animation:none; } }
+
+/* ---------- aviso de valor fuera de lo habitual: no bloquea, solo advierte ---------- */
+.campo-anomalo input{ border-color:var(--gold) !important; background:var(--gold-bg); }
+.aviso-anomalia{ display:flex; align-items:flex-start; gap:7px; margin-top:6px; padding:7px 10px; border-radius:var(--r-2); background:var(--gold-bg); color:var(--gold-ink); font-size:calc(12.5px * var(--esc,1)); font-weight:600; line-height:1.4; animation:revela .25s var(--curva) both; }
+.aviso-anomalia i{ margin-top:1px; flex:none; }
+
+/* ---------- aviso de borrador local sin guardar ---------- */
+.aviso-borrador{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; padding:9px 12px; border-radius:var(--r-2); background:var(--sunk); border:1px dashed var(--line-strong); font-size:calc(12.5px * var(--esc,1)); color:var(--ink-2); }
+.aviso-borrador i{ color:var(--gold-ink); flex:none; }
+.aviso-borrador-acc{ display:flex; gap:4px; margin-left:auto; }
+.aviso-borrador-acc .btn-texto{ font-weight:700; text-decoration:underline; }

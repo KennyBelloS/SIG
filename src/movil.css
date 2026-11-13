@@ -136,7 +136,7 @@ body.movil .tour-compacto{ border-radius:28px 28px 0 0; }
 .crear-ident{ display:flex; align-items:center; gap:12px; } .crear-marca{ font:600 calc(24px * var(--esc,1))/1 var(--serif); color:rgba(255,255,255,.8); } .crear-marca i{ font-weight:500; }
 .instalar-logo{ width:68px; height:68px; border-radius:20px; } .instalar-logo img{ width:52px; height:52px; }
 .mv-buscar-texto i{ margin-right:10px; font-size:calc(17px * var(--esc,1)); font-style:normal; }
-.crear-carta.sola{ grid-column:1 / -1; aspect-ratio:2.6; }
+.crear-carta.sola, .crear-carta:last-child:nth-child(odd){ grid-column:1 / -1; aspect-ratio:2.6; }
 .hi-sub{ color:var(--ink-3); margin:-4px 2px 12px; font-size:calc(14.5px * var(--esc,1)); } .hi-grupo h3{ font:600 calc(22px * var(--esc,1))/1.1 var(--serif); color:var(--f-900); margin:16px 2px 8px; }
 .hoja-ico.hi-pendiente{ background:var(--gold-bg); color:var(--gold-ink); } .hoja-ico.hi-no{ background:var(--wine-bg); color:var(--wine); }
 

@@ -203,6 +203,26 @@ export default function Layout() {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', enviar); };
   }, [sesion?.id, pathname]);
 
+  // flechas para correr la barra de módulos: antes la barra sí se podía arrastrar cuando no cabía
+  // entera (con letra más grande, con el zoom del navegador, con pantallas angostas), pero no había
+  // ninguna pista visible de que eso era posible. Ahora, si sobra contenido a un lado, aparece una
+  // flecha bien marcada de ese lado; tocarla corre la barra en esa dirección.
+  const [navDesborda, setNavDesborda] = useState({ izq: false, der: false });
+  useLayoutEffect(() => {
+    const nav = navRef.current; if (!nav) return undefined;
+    const medirDesborde = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = nav;
+      setNavDesborda({ izq: scrollLeft > 4, der: scrollLeft + clientWidth < scrollWidth - 4 });
+    };
+    medirDesborde();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(medirDesborde) : null;
+    if (ro) ro.observe(nav);
+    nav.addEventListener('scroll', medirDesborde, { passive: true });
+    window.addEventListener('resize', medirDesborde);
+    return () => { if (ro) ro.disconnect(); nav.removeEventListener('scroll', medirDesborde); window.removeEventListener('resize', medirDesborde); };
+  }, []);
+  const correrNav = dir => navRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
+
   // el marcador dorado se desliza hasta la sección activa
   useLayoutEffect(() => {
     const nav = navRef.current;
@@ -288,6 +308,8 @@ export default function Layout() {
       <header className="mast">
         <div className="mast-fila">
           <Marca />
+          <div className="mast-nav-caja">
+          {navDesborda.izq && <button type="button" className="mast-nav-flecha izq" onClick={() => correrNav(-1)} aria-label="Ver los módulos anteriores"><i className="fa-solid fa-chevron-left" aria-hidden="true" /></button>}
           <nav className="mast-nav" aria-label="Secciones" ref={navRef}>
             <span className="mast-marcador" aria-hidden="true" style={marcador ? { transform: `translateX(${marcador.x}px)`, width: marcador.w, opacity: 1 } : { opacity: 0 }} />
             {grupos.filter(g => g.titulo !== 'Próximamente').map((g, gi) => (
@@ -296,6 +318,8 @@ export default function Layout() {
               </div>
             ))}
           </nav>
+          {navDesborda.der && <button type="button" className="mast-nav-flecha der" onClick={() => correrNav(1)} aria-label="Ver los módulos siguientes"><i className="fa-solid fa-chevron-right" aria-hidden="true" /></button>}
+          </div>
           <MenuProximamente items={grupos.find(g => g.titulo === 'Próximamente')?.items} navegar={navegar} />
           <button type="button" className="mast-buscar" onClick={() => setPaleta(true)} aria-label="Buscar un indicador o una sección (Ctrl K)">
             <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span>Buscar</span><kbd>Ctrl K</kbd>

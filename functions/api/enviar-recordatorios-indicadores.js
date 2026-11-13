@@ -438,6 +438,12 @@ export async function onRequestGet({ request, env }) {
     const [cfg0] = await db.get('indicadores_configuracion?id=eq.1&select=*');
     const depuracion = await gestionarDepuracion(db, cfg0, ahoraColombia());
 
+    // Las notas «alguien depuró N registros» de la Actividad son ruido sobre el propio proceso de
+    // limpieza, no auditoría real: se borran solas pasado 1 día. El resto de la Actividad no se toca.
+    let notasDepuracion;
+    try { notasDepuracion = { eliminadas: await db.rpc('indicadores_limpiar_notas_depuracion') }; }
+    catch (e) { notasDepuracion = { error: String(e.message || e).slice(0, 160) }; }
+
     const cfg = (await db.get('indicadores_configuracion?id=eq.1&select=*'))[0];
     if (!cfg || !cfg.activo) return json({ ok: true, omitido: 'inactivo', depuracion });
     const activos = await resolverActivos(db, env);
@@ -448,7 +454,10 @@ export async function onRequestGet({ request, env }) {
     const diaCierre = cfg.dia_cierre ?? 15;
     const diaAviso = Math.max(1, diaCierre - 2);
     const { anioReporte, mesReporte } = mesReporteActual();
-    const salida = { ok: true, fecha: hoyISO, depuracion };
+    // «imagenes» en la respuesta: así se ve en «Run workflow» cuál logo/ícono no se publicó y por qué,
+    // en vez de descubrirlo solo porque el correo llegó con el nombre en texto en lugar del logo.
+    const imagenes = Object.fromEntries(Object.keys(ACTIVOS).map(k => [k, activos[k] ? 'publicado' : 'FALTA (revisa SUPABASE_SERVICE_ROLE_KEY y que el bucket "publico" se haya podido crear)']));
+    const salida = { ok: true, fecha: hoyISO, depuracion, notasDepuracion, imagenes };
     const comun = { anio: anioReporte, mes: mesReporte, cfg, activos, appUrl, modo: 'automatico' };
     const esteMes = hoyISO.slice(0, 7);
     const yaEnviado = fecha => String(fecha || '').slice(0, 7) === esteMes;

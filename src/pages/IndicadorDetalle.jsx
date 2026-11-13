@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { leerBorrador, guardarBorrador, borrarBorrador, hace } from '../lib/borrador';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { anotarReciente } from '../lib/recientes';
 import { useSesion } from '../lib/useSesion';
@@ -88,8 +89,7 @@ export default function IndicadorDetalle() {
 
   function abrirMes(mes) {
     const reg = porMes.get(mes);
-    setMesAbierto(mes);
-    setForm({
+    const deServidor = {
       valor: valorAEntrada(indicador, reg?.valor),
       a: reg?.componentes?.a ?? '', b: reg?.componentes?.b ?? '',
       analisis: reg?.analisis ?? '',
@@ -97,8 +97,47 @@ export default function IndicadorDetalle() {
       accion: reg?.accion ?? '',
       responsable_accion: reg?.responsable_accion ?? '',
       fecha_compromiso: reg?.fecha_compromiso ?? '',
-    });
+    };
+    setMesAbierto(mes);
+    setForm(deServidor);
+    cargaOriginal.current = deServidor;   // contra esto se compara para saber si hay algo sin guardar
+    // cada mes tiene su propio borrador: ir y volver con las flechas nunca mezcla uno con otro
+    const b = leerBorrador(`${id}:${anio}:${mes}`);
+    const distinto = b && JSON.stringify(b.datos) !== JSON.stringify(deServidor);
+    setBorradorDisponible(distinto ? b : null);
   }
+  const cargaOriginal = useRef(null);
+  const [borradorDisponible, setBorradorDisponible] = useState(null);
+
+  function restaurarBorrador() {
+    if (!borradorDisponible) return;
+    setForm(borradorDisponible.datos);
+    setBorradorDisponible(null);
+  }
+  function descartarBorrador() {
+    if (mesAbierto) borrarBorrador(`${id}:${anio}:${mesAbierto}`);
+    setBorradorDisponible(null);
+  }
+
+
+  // Promedio histórico de este indicador (sin contar el mes que se está editando): si lo que se
+  // escribe se dispara muy por encima o por debajo, es casi siempre un error de digitación
+  // (un cero de más, una coma corrida). No bloquea — solo avisa, porque a veces sí es real.
+  const promedioHistorico = useMemo(() => {
+    const valores = registros.filter(r => r.mes !== mesAbierto && r.valor != null && !Number.isNaN(Number(r.valor))).map(r => Number(r.valor));
+    if (valores.length < 3) return null;   // con menos de 3 datos, un promedio no dice nada confiable
+    return valores.reduce((a, b) => a + b, 0) / valores.length;
+  }, [registros, mesAbierto]);
+  const anomalia = useMemo(() => {
+    if (promedioHistorico == null || Math.abs(promedioHistorico) < 0.0001) return null;
+    const v = entradaAValor(indicador, form.valor);
+    if (v == null || Number.isNaN(v)) return null;
+    const veces = v / promedioHistorico;
+    const prom = Math.round(promedioHistorico * 100) / 100;
+    if (veces >= 3) return `Esto es ${veces.toFixed(1)}× el promedio habitual (${prom}). ¿Seguro que no sobra un cero?`;
+    if (veces > 0 && veces <= 0.33) return `Esto es apenas una fracción del promedio habitual (${prom}). ¿Seguro que está completo?`;
+    return null;
+  }, [form.valor, promedioHistorico, indicador]);
 
   /** El resultado del formulario: el que sale de los dos números (si el indicador se calcula y ya están) o el digitado. */
   function valorDelFormulario() {
@@ -138,6 +177,7 @@ export default function IndicadorDetalle() {
       });
       const cumple = cumpleMeta(indicador, valorDelFormulario(), mesAbierto);
       const nombreMes = MESES[mesAbierto - 1];
+      borrarBorrador(`${id}:${anio}:${mesAbierto}`);   // ya se guardó de verdad: el borrador sobra
       setExito(true); await new Promise(res => setTimeout(res, menosMovimiento() ? 120 : 700));   // el botón se tiñe de verde y dibuja un visto antes de cerrar
       setMesAbierto(null);
       await cargar();
@@ -202,6 +242,30 @@ export default function IndicadorDetalle() {
 
   const mesCerrado = mesAbierto && mesCerradoEn(mesAbierto);
   const puedeEditarMes = !mesCerrado && !!sesion?.puedeRegistrar;
+
+  // Autoguardado: cada 2 s, si lo que hay en el formulario es distinto de lo que vino del servidor,
+  // queda guardado en este mismo equipo. No es el guardado real (ese sigue siendo el botón Guardar);
+  // es solo para no perderlo si se va la luz o se cierra la pestaña por error.
+  useEffect(() => {
+    if (!mesAbierto || !puedeEditarMes) return undefined;
+    const t = setTimeout(() => {
+      const clave = `${id}:${anio}:${mesAbierto}`;
+      if (JSON.stringify(form) !== JSON.stringify(cargaOriginal.current)) guardarBorrador(clave, form);
+      else borrarBorrador(clave);   // volvió a quedar igual que el servidor: no hace falta guardar nada
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [form, mesAbierto, id, anio]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Si hay algo sin guardar y tratan de cerrar la pestaña, se avisa antes de perderlo.
+  useEffect(() => {
+    const avisoSalida = e => {
+      if (mesAbierto && puedeEditarMes && JSON.stringify(form) !== JSON.stringify(cargaOriginal.current)) {
+        e.preventDefault(); e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', avisoSalida);
+    return () => window.removeEventListener('beforeunload', avisoSalida);
+  });   // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="page">
@@ -399,9 +463,20 @@ export default function IndicadorDetalle() {
       </section>
 
       {mesAbierto && (
-        <Dialogo titulo={`${MESES[mesAbierto - 1]} ${anio}`} onCerrar={() => setMesAbierto(null)}>
+        <Dialogo titulo={`${MESES[mesAbierto - 1]} ${anio}`} onCerrar={() => setMesAbierto(null)} variante="cajon"
+          onFlecha={dir => abrirMes(dir === 'abajo' ? Math.min(12, mesAbierto + 1) : Math.max(1, mesAbierto - 1))}>
           <form className="form-dialogo" onSubmit={puedeEditarMes ? guardar : e => e.preventDefault()}>
             <h2>{MESES[mesAbierto - 1]} {anio}{mesCerrado && <span className="titulo-cerrado"><i className="fa-solid fa-lock" aria-hidden="true"></i> Cerrado</span>}</h2>
+            {borradorDisponible && (
+              <div className="aviso-borrador" role="status">
+                <i className="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                <span>Tienes un borrador sin guardar de {hace(borradorDisponible.en)}.</span>
+                <div className="aviso-borrador-acc">
+                  <button type="button" className="btn-texto" onClick={restaurarBorrador}>Restaurar</button>
+                  <button type="button" className="btn-texto" onClick={descartarBorrador}>Descartar</button>
+                </div>
+              </div>
+            )}
             {!sesion?.puedeRegistrar && (
               <div className="aviso aviso-info" style={{ marginTop: 0 }}><i className="fa-solid fa-eye"></i><span>Tu rol es de consulta: puedes ver este mes, pero no registrarlo ni editarlo.</span></div>
             )}
@@ -443,15 +518,17 @@ export default function IndicadorDetalle() {
                 );
               })() : (
               <label>Valor del indicador
-                <div className="campo-con-sufijo">
+                <div className={`campo-con-sufijo${anomalia ? ' campo-anomalo' : ''}`}>
                   <input
                     type="number" step="any" autoFocus
                     value={form.valor}
                     onChange={e => setForm(f => ({ ...f, valor: e.target.value }))}
                     placeholder={esPorcentaje(indicador) ? 'Ej: 95' : `Valor en ${indicador.unidad_medida || 'unidades'}`}
+                    aria-describedby={anomalia ? 'aviso-anomalia' : undefined}
                   />
                   <span className="sufijo">{esPorcentaje(indicador) ? '%' : (indicador.unidad_medida || '')}</span>
                 </div>
+                {anomalia && <p id="aviso-anomalia" className="aviso-anomalia" role="status"><i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> {anomalia}</p>}
                 <small className="ayuda-campo">
                   {esPorcentaje(indicador)
                     ? `Escribe el porcentaje tal cual: 95 significa 95%. Meta: ${formatearMeta(indicador)}.`

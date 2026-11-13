@@ -489,3 +489,25 @@ begin
     end loop;
   end if;
 end $$;
+
+-- =====================================================================
+-- Las notas «alguien depuró N registros» de la Actividad se limpian solas
+-- después de 1 día: son ruido sobre el proceso de limpieza, no auditoría
+-- real de quién cambió qué. El resto de la Actividad NO se toca.
+-- =====================================================================
+create or replace function public.indicadores_limpiar_notas_depuracion()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_n integer;
+begin
+  delete from public.indicadores_auditoria
+   where accion = 'depurar' and creado_en < (now() - interval '1 day');
+  get diagnostics v_n = row_count;
+  return v_n;
+end;
+$$;
+revoke all on function public.indicadores_limpiar_notas_depuracion() from public, anon;
+grant execute on function public.indicadores_limpiar_notas_depuracion() to authenticated, service_role;

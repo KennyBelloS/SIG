@@ -893,3 +893,15 @@ tr.se-va{ animation:arrugar .52s cubic-bezier(.45,0,.75,.3) both, cerrar-hueco .
 .idioma-acciones{ display:flex; gap:10px; margin-top:var(--s-4); }
 .idioma-acciones button{ flex:1; }
 @media (prefers-reduced-motion:reduce){ .idioma-pista, .idioma-op{ transition:none; } }
+
+/* ---------- flechas bien visibles para correr la barra de módulos ----------
+   Antes la barra SÍ se podía arrastrar cuando no cabía entera (con letra grande, con el zoom del
+   navegador, en pantallas angostas), pero no había ninguna pista de que eso fuera posible: la
+   barra de scroll nativa está oculta a propósito (para que no se vea un listón gris feo ahí).
+   Estas flechas solo aparecen cuando de verdad sobra algo de ese lado. */
+.mast-nav-caja{ position:relative; flex:1; min-width:0; display:flex; align-items:stretch; }
+.mast-nav-caja .mast-nav{ flex:1; }
+.mast-nav-flecha{ flex:none; z-index:2; width:30px; display:grid; place-items:center; color:#fff; background:linear-gradient(90deg,var(--f-900) 42%,transparent); align-self:stretch; animation:revela .2s ease both; }
+.mast-nav-flecha.der{ background:linear-gradient(270deg,var(--f-900) 42%,transparent); }
+.mast-nav-flecha:hover{ color:var(--gold); }
+.mast-nav-flecha i{ font-size:13px; }

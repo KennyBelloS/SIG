@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { leerRecientes } from '../../lib/recientes';
 
 /** El botón «+»: una cortina verde a pantalla completa que nace del propio botón y trae tarjetas inclinadas.
  *  Cada tarjeta es una acción DISTINTA que no está ya en otro lado (la búsqueda y las pestañas viven aparte):
- *  registrar lo que falta, crear un indicador, importar un Excel, descargar el informe, ver lo que no cumple. */
+ *  seguir con lo último, registrar lo que falta, crear un indicador, importar un Excel, descargar el
+ *  informe, ver lo que no cumple. La de «seguir con lo último» va primero a propósito: es la que de
+ *  verdad se usa todos los días, antes que crear algo nuevo (que se hace una vez cada tanto). */
 export default function CrearOverlay({ origen, sesion, onCerrar, navegar, onHoja }) {
   const [abierto, setAbierto] = useState(false);
   const raiz = useRef(null);
@@ -31,14 +34,17 @@ export default function CrearOverlay({ origen, sesion, onCerrar, navegar, onHoja
   useEffect(() => { if (abierto) setTimeout(() => raiz.current?.querySelector('.crear-carta.oscura')?.focus(), 500); }, [abierto]);
 
   const registra = !!sesion?.puedeRegistrar;
+  const ultimo = leerRecientes()[0];
+  const seguir = ultimo ? { icono: 'fa-clock-rotate-left', texto: `Seguir con ${ultimo.nombre}`, accion: () => ir(`/indicadores/${ultimo.id}`), oscura: true } : null;
   const informe = { icono: 'fa-file-pdf', texto: 'Descargar el informe del mes', accion: () => ir('/informe') };
-  const faltan = { icono: 'fa-list-check', texto: 'Registrar lo que falta', accion: () => cerrar(() => onHoja('pendientes')), oscura: true };
+  const faltan = { icono: 'fa-list-check', texto: 'Registrar lo que falta', accion: () => cerrar(() => onHoja('pendientes')), oscura: !seguir };
   const importar = { icono: 'fa-file-excel', texto: 'Importar un Excel', accion: () => ir('/importar') };
   const cartas = (sesion?.esAdmin
-    ? [{ icono: 'fa-plus', texto: 'Crear un indicador', accion: () => ir('/configuracion?nuevo=1') }, faltan, importar, informe]
-    : registra ? [informe, faltan, importar]
-    : [{ icono: 'fa-triangle-exclamation', texto: 'Ver lo que no cumple', accion: () => cerrar(() => onHoja('nocumplen')), oscura: true }, informe])
-    .map((c, k) => ({ ...c, rot: [-5, 4, -3, 5][k % 4], sola: k === 2 && !sesion?.esAdmin && registra }));
+    ? [seguir, { icono: 'fa-plus', texto: 'Crear un indicador', accion: () => ir('/configuracion?nuevo=1') }, faltan, importar, informe]
+    : registra ? [seguir, informe, faltan, importar]
+    : [seguir, { icono: 'fa-triangle-exclamation', texto: 'Ver lo que no cumple', accion: () => cerrar(() => onHoja('nocumplen')), oscura: !seguir }, informe])
+    .filter(Boolean)
+    .map((c, k) => ({ ...c, rot: [-5, 4, -3, 5][k % 4] }));
   return (
     <div ref={raiz} className={`crear${abierto ? ' abierto' : ''}`} style={{ '--x': `${x}px`, '--y': `${y}px`, '--r': `${radio}px` }} role="dialog" aria-modal="true" aria-label="¿Qué quieres hacer hoy?">
       <div className="crear-cab">
